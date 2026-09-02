@@ -126,6 +126,7 @@
     line-height:1.05;
   }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -185,10 +186,30 @@
       </div>
     </div>
     <label>Tagged workout text</label>
+    <label for="ocrInput" class="secondary" style="display:block; text-align:center; padding:14px; margin-bottom:10px; cursor:pointer;">
+      📷 Scan Screenshot(s) — extracts raw text automatically
+    </label>
+    <input type="file" id="ocrInput" accept="image/*" multiple style="display:none;" onchange="runOCR()">
+    <div id="ocrStatus" style="color:var(--muted); font-size:12px; margin-bottom:10px; text-align:center;"></div>
     <textarea id="addRaw" placeholder="EXERCISE: ... | ...
 SET: ... | ... | 2'
 REST: 2' | Rest 2 minutes"></textarea>
     <button class="primary" style="margin-top:16px;" onclick="saveWorkout()">Save Workout</button>
+
+    <label style="margin-top:26px;">Need a template?</label>
+    <div style="background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:14px; backdrop-filter:blur(10px);">
+      <pre id="exampleText" style="white-space:pre-wrap; font-family:ui-monospace,monospace; font-size:12px; color:var(--muted); margin:0 0 12px; line-height:1.5;">SECTION: Warm-Up | Time to warm up.
+EXERCISE: Assault Bike | Assault Bike. Pedal at a steady pace. | 5'
+SET: 20 Air Squats | Air Squats, bodyweight. 20 reps.
+
+SECTION: Strength A, Back Squat | First strength block.
+EXERCISE: Back Squat | Back Squat. Bar on your back, squat down and stand back up.
+SET: Hard Set 1 of 3, 5 reps / 185 lbs | Hard Set, 1 of 3. 5 reps at 185 pounds
+REST: 2' | Rest 2 minutes
+SET: Hard Set 2 of 3, 5 reps / 185 lbs | Hard Set, 2 of 3. 5 reps at 185 pounds
+REST: 2' | Rest 2 minutes</pre>
+      <button class="secondary" style="width:100%; padding:12px; font-size:13px;" onclick="insertExample()">Insert Example Into Box Above</button>
+    </div>
   </div>
 </div>
 
@@ -319,6 +340,31 @@ function setType(t){
   document.getElementById('typeRun').classList.toggle('active', t==='Run');
   document.getElementById('typeStrength').classList.toggle('active', t==='Strength');
   updateAutoTitle();
+}
+function insertExample(){
+  document.getElementById('addRaw').value = document.getElementById('exampleText').innerText.trim();
+}
+
+async function runOCR(){
+  const files = document.getElementById('ocrInput').files;
+  if(!files.length) return;
+  const status = document.getElementById('ocrStatus');
+  const textarea = document.getElementById('addRaw');
+  let combined = textarea.value ? textarea.value + '\n\n' : '';
+
+  for(let i = 0; i < files.length; i++){
+    status.innerText = `Scanning image ${i+1} of ${files.length}...`;
+    try{
+      const result = await Tesseract.recognize(files[i], 'eng');
+      combined += result.data.text.trim() + '\n\n';
+    }catch(err){
+      status.innerText = 'Error reading an image — try again, or type it manually.';
+      console.error(err);
+      return;
+    }
+  }
+  textarea.value = combined.trim();
+  status.innerText = 'Done. This is raw extracted text — clean it up into EXERCISE/SET/REST tags before saving, or paste it to Claude in chat for proper formatting.';
 }
 
 /* ---------- Home list ---------- */
