@@ -6,8 +6,7 @@
 <title>Workout Reader</title>
 <style>
   :root{
-    --bg1:#0a0b0f; --bg2:#14151c;
-    --exercise:#5b8def; --detail:#a679f0; --rest:#37c982;
+    --bg1:#0a0b0f; --exercise:#5b8def; --detail:#a679f0; --rest:#37c982; --run:#f0a63a;
     --text:#f7f7fa; --muted:#83848c; --border:rgba(255,255,255,.08);
     --card-bg:rgba(255,255,255,.045);
   }
@@ -18,124 +17,450 @@
     color:var(--text); min-height:100vh; display:flex; flex-direction:column;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{padding:18px; flex:1; display:flex; flex-direction:column; max-width:480px; margin:0 auto; width:100%;}
-  h1{font-size:12px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin:4px 0 18px; text-align:center; font-weight:700;}
+  .wrap{padding:18px; padding-bottom:90px; flex:1; display:flex; flex-direction:column; max-width:480px; margin:0 auto; width:100%; min-height:100vh;}
+  h1{font-size:12px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin:4px 0 4px; font-weight:700;}
+  .greeting{font-size:26px; font-weight:800; margin:2px 0 20px;}
 
-  textarea{
-    width:100%; min-height:180px; background:var(--card-bg); color:var(--text);
-    border:1px solid var(--border); border-radius:16px; padding:16px; font-size:14px;
-    resize:vertical; line-height:1.6; font-family:ui-monospace,monospace;
-    backdrop-filter:blur(10px);
-  }
-  .hint{color:var(--muted); font-size:13px; margin-bottom:12px; line-height:1.5;}
   button{border:none; border-radius:16px; font-weight:700; cursor:pointer; font-family:inherit; transition:transform .08s ease;}
   button:active{transform:scale(.95);}
   .primary{
     background:linear-gradient(135deg,#6c8cff,#5b8def); color:white; width:100%;
-    padding:17px; font-size:16px; margin-top:14px; box-shadow:0 6px 20px rgba(91,141,239,.35);
+    padding:17px; font-size:16px; box-shadow:0 6px 20px rgba(91,141,239,.35);
   }
   .secondary{background:var(--card-bg); color:var(--text); border:1px solid var(--border); backdrop-filter:blur(10px);}
+  .icon-btn{background:var(--card-bg); border:1px solid var(--border); width:42px; height:42px; border-radius:14px; font-size:18px; display:flex; align-items:center; justify-content:center;}
 
-  #viewer{display:none; flex:1; flex-direction:column;}
+  input[type=text], input[type=number], input[type=date], textarea{
+    width:100%; background:var(--card-bg); color:var(--text);
+    border:1px solid var(--border); border-radius:14px; padding:14px; font-size:15px;
+    backdrop-filter:blur(10px); font-family:inherit;
+  }
+  textarea{min-height:180px; font-family:ui-monospace,monospace; font-size:13px; line-height:1.5; resize:vertical;}
+  label{font-size:12px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.8px; margin:14px 0 6px; display:block;}
+  .type-toggle{display:flex; gap:8px;}
+  .type-toggle button{flex:1; padding:12px; font-size:14px;}
+  .type-toggle button.active{background:linear-gradient(135deg,#6c8cff,#5b8def); color:white;}
+  .row2{display:flex; gap:10px;}
+  .row2 > div{flex:1;}
 
+  .top-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;}
+
+  .wlist{display:flex; flex-direction:column; gap:10px; margin-top:6px;}
+  .wcard{
+    background:var(--card-bg); border:1px solid var(--border); border-radius:18px; padding:16px;
+    display:flex; align-items:center; gap:14px; backdrop-filter:blur(10px);
+  }
+  .wcard:active{transform:scale(.98);}
+  .wcard .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+  .wcard .info{flex:1; min-width:0;}
+  .wcard .title{font-weight:700; font-size:15px; margin-bottom:3px;}
+  .wcard .meta{font-size:12px; color:var(--muted);}
+  .wcard .chev{color:var(--muted); font-size:18px;}
+  .empty{color:var(--muted); font-size:14px; text-align:center; padding:40px 20px; line-height:1.6;}
+
+  .navbar{
+    position:fixed; bottom:0; left:0; right:0; display:flex; justify-content:center;
+    padding:14px 18px calc(14px + env(safe-area-inset-bottom)); background:linear-gradient(to top, rgba(10,11,15,.95), rgba(10,11,15,.7));
+    backdrop-filter:blur(20px); border-top:1px solid var(--border);
+  }
+  .navbar-inner{display:flex; gap:8px; max-width:480px; width:100%;}
+  .navbtn{flex:1; padding:12px; font-size:13px; background:none; border:none; color:var(--muted); font-weight:700;}
+  .navbtn.active{color:var(--exercise);}
+
+  /* Chart */
+  .chart-card{background:var(--card-bg); border:1px solid var(--border); border-radius:18px; padding:18px; margin-bottom:16px; backdrop-filter:blur(10px);}
+  .chart-title{font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;}
+  .chart-total{font-size:24px; font-weight:800; margin-bottom:2px;}
+
+  /* Reader (reused) */
   .progress-row{display:flex; align-items:center; gap:10px; margin-bottom:18px;}
   .progress-label{font-size:12px; color:var(--muted); font-weight:600; white-space:nowrap;}
   .progress-track{flex:1; height:4px; background:var(--border); border-radius:4px; overflow:hidden;}
   .progress-fill{height:100%; border-radius:4px; transition:width .35s cubic-bezier(.4,0,.2,1);}
-
   .card{
     flex:1; border-radius:26px; padding:30px 22px; display:flex; flex-direction:column;
     align-items:center; justify-content:center; text-align:center; min-height:300px;
     background:var(--card-bg); border:1.5px solid var(--border); backdrop-filter:blur(16px);
     position:relative; overflow:hidden; transition:opacity .22s ease, transform .22s ease;
   }
-  .card::before{
-    content:''; position:absolute; top:0; left:0; right:0; height:4px;
-    background:var(--type-color, var(--exercise));
-  }
+  .card::before{content:''; position:absolute; top:0; left:0; right:0; height:4px; background:var(--type-color, var(--exercise));}
   .card.fade-out{opacity:0; transform:translateY(8px) scale(.98);}
-
-  .type-pill{
-    display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px;
-    font-size:11px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase;
-    background:color-mix(in srgb, var(--type-color) 18%, transparent);
-    color:var(--type-color); margin-bottom:16px;
-  }
+  .type-pill{display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:11px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; background:color-mix(in srgb, var(--type-color) 18%, transparent); color:var(--type-color); margin-bottom:16px;}
   .diagram{width:88px; height:88px; margin-bottom:6px; opacity:.85;}
   .step-text{font-size:22px; font-weight:700; line-height:1.45; white-space:pre-wrap;}
   .set-badge{font-size:13px; color:var(--muted); font-weight:600; margin-top:8px;}
-
   .timer-display{font-size:58px; font-weight:800; font-variant-numeric:tabular-nums; margin:14px 0 6px; color:var(--rest);}
-  .timer-ring{width:140px; height:140px; margin:6px 0;}
   .timer-controls{display:flex; gap:10px; margin-top:10px;}
   .timer-controls button{padding:11px 20px; font-size:14px; border-radius:12px;}
-
   .controls{display:flex; gap:10px; margin-top:18px;}
   .controls button{flex:1; padding:17px; font-size:15px; border-radius:16px;}
-  .read-btn{
-    background:var(--card-bg); color:var(--text); border:1px solid var(--border);
-    flex:0 0 58px !important; font-size:21px !important; padding:17px 0 !important;
-  }
+  .read-btn{background:var(--card-bg); color:var(--text); border:1px solid var(--border); flex:0 0 58px !important; font-size:21px !important; padding:17px 0 !important;}
   .read-btn.speaking{background:linear-gradient(135deg,#6c8cff,#5b8def); animation:pulse 1s infinite;}
   @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(91,141,239,.5);} 50%{box-shadow:0 0 0 8px rgba(91,141,239,0);}}
-
   .footer-row{display:flex; align-items:center; justify-content:space-between; margin-top:16px; padding:0 4px;}
   .toggle{display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px;}
   .toggle input{accent-color:var(--exercise); width:16px; height:16px;}
   .reset-link{color:var(--muted); font-size:13px; background:none; border:none; text-decoration:underline; padding:8px;}
+
+  .screen{display:none; flex-direction:column; flex:1;}
+  .screen.active{display:flex;}
+  @keyframes confettiFall{
+    0%{ transform:translateY(0) rotate(0deg); opacity:1; }
+    100%{ transform:translateY(110vh) rotate(360deg); opacity:0; }
+  }
+
+  .hero{
+    position:relative; height:190px; border-radius:24px; overflow:hidden; margin-bottom:20px;
+    background:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.025) 0 2px, transparent 2px 14px),
+      radial-gradient(circle at 15% 110%, rgba(232,72,79,.35), transparent 55%),
+      linear-gradient(135deg, #1a0708, #050506 70%);
+    display:flex; align-items:flex-end; padding:20px;
+    box-shadow: inset 0 0 60px rgba(0,0,0,.5);
+  }
+  .hero-figure{position:absolute; right:-10px; top:10px; height:210px; opacity:.16; transform:rotate(-4deg);}
+  .hero-kicker{color:#ff8a5c; font-size:11px; font-weight:800; letter-spacing:3px; text-transform:uppercase; margin-bottom:4px;}
+  .hero-title{
+    font-size:30px; font-weight:900; letter-spacing:-.5px; text-transform:uppercase; font-style:italic;
+    background:linear-gradient(90deg,#fff,#ffb199); -webkit-background-clip:text; background-clip:text; color:transparent;
+    line-height:1.05;
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Workout Reader</h1>
 
-  <div id="input">
-    <div class="hint">Paste the tagged workout text. Repeated sets should be written as individual SET lines with REST after each — not bundled together.</div>
-    <textarea id="raw" placeholder="EXERCISE: Pause Barbell Box Squat | ...
-SET: 1 of 3 | Set 1 of 3, ...
-REST: 2' | Rest 2 minutes
-SET: 2 of 3 | Set 2 of 3, ...
-REST: 2' | Rest 2 minutes"></textarea>
-    <button class="primary" onclick="loadWorkout()">Load Workout</button>
+<!-- HOME -->
+<div class="screen active" id="screenHome">
+  <div class="wrap">
+    <div class="hero">
+      <svg class="hero-figure" viewBox="0 0 100 100"><rect x="60" y="55" width="26" height="22" fill="#fff" opacity="0.9" rx="2"/><circle cx="26" cy="26" r="9" fill="#fff" opacity="0.9"/><path d="M26 35 L36 58 L58 63 M36 58 L24 90 M36 58 L46 90" stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round" opacity="0.9"/></svg>
+      <div>
+        <div class="hero-kicker">Hyrox Training Log</div>
+        <div class="hero-title">No Excuses</div>
+      </div>
+    </div>
+    <div class="greeting">Welcome, Ty</div>
+    <button class="primary" onclick="goAdd()">+ New Workout</button>
+    <label style="margin-top:26px;">Your workouts</label>
+    <div class="wlist" id="wlist"></div>
   </div>
+  <div class="navbar"><div class="navbar-inner">
+    <button class="navbtn active" onclick="goHome()">🏠 Home</button>
+    <button class="navbtn" onclick="goData()">📊 Data</button>
+  </div></div>
+</div>
 
-  <div id="viewer">
+<!-- CONFIRM MODAL -->
+<div id="confirmOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:50; align-items:center; justify-content:center; padding:24px;">
+  <div style="background:#1a1b1e; border:1px solid var(--border); border-radius:20px; padding:24px; max-width:320px; width:100%; text-align:center;">
+    <div id="confirmMessage" style="font-size:15px; margin-bottom:20px; line-height:1.5;"></div>
+    <div style="display:flex; gap:10px;">
+      <button class="secondary" style="flex:1; padding:14px;" onclick="hideConfirm()">Cancel</button>
+      <button class="primary" style="flex:1; margin-top:0; background:linear-gradient(135deg,#f76c6c,#e8484f);" onclick="confirmYes()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD -->
+<div class="screen" id="screenAdd">
+  <div class="wrap">
+    <div class="top-row">
+      <button class="icon-btn" onclick="goHome()">✕</button>
+      <h1 style="margin:0;">New Workout</h1>
+      <div style="width:42px;"></div>
+    </div>
+    <label>Title</label>
+    <input type="text" id="addTitle" placeholder="e.g. Box Squat + Sled" oninput="titleEdited=true">
+    <div class="row2">
+      <div>
+        <label>Date</label>
+        <input type="date" id="addDate" onchange="updateAutoTitle()">
+      </div>
+      <div>
+        <label>Type</label>
+        <div class="type-toggle">
+          <button id="typeRun" onclick="setType('Run')">Run</button>
+          <button id="typeStrength" onclick="setType('Strength')">Strength</button>
+        </div>
+      </div>
+    </div>
+    <label>Tagged workout text</label>
+    <textarea id="addRaw" placeholder="EXERCISE: ... | ...
+SET: ... | ... | 2'
+REST: 2' | Rest 2 minutes"></textarea>
+    <button class="primary" style="margin-top:16px;" onclick="saveWorkout()">Save Workout</button>
+  </div>
+</div>
+
+<!-- DATA -->
+<div class="screen" id="screenData">
+  <div class="wrap">
+    <h1>Data</h1>
+    <div class="greeting" style="margin-bottom:20px;">Your Trends</div>
+    <div id="dataContent"></div>
+  </div>
+  <div class="navbar"><div class="navbar-inner">
+    <button class="navbtn" onclick="goHome()">🏠 Home</button>
+    <button class="navbtn active" onclick="goData()">📊 Data</button>
+  </div></div>
+</div>
+
+<!-- COMPLETE -->
+<div class="screen" id="screenComplete">
+  <div class="wrap" style="align-items:center; justify-content:center; text-align:center; position:relative; overflow:hidden;">
+    <div id="confettiLayer" style="position:absolute; inset:0; pointer-events:none;"></div>
+    <div style="font-size:52px; margin-bottom:10px;">🎉</div>
+    <div class="greeting" style="margin-bottom:6px;">Nice work, Ty!</div>
+    <div style="color:var(--muted); font-size:15px; margin-bottom:28px;">You completed your workout.</div>
+    <div style="width:100%; max-width:320px;">
+      <div id="completeDistanceWrap">
+        <label style="text-align:left;">Distance (mi)</label>
+        <input type="number" step="0.1" id="completeDistance" placeholder="0.0">
+      </div>
+      <label style="text-align:left;">Duration (min)</label>
+      <input type="number" id="completeDuration" placeholder="0">
+      <button class="primary" style="margin-top:20px;" onclick="finishWorkout()">Save & Finish</button>
+      <button class="secondary" style="width:100%; margin-top:10px; padding:14px;" onclick="finishWorkout(true)">Skip, just take me home</button>
+    </div>
+  </div>
+</div>
+
+<!-- PLAYER -->
+<div class="screen" id="screenPlayer">
+  <div class="wrap">
+    <div class="top-row">
+      <button class="icon-btn" onclick="goHome()">✕</button>
+      <h1 style="margin:0;" id="playerTitle"></h1>
+      <div style="width:42px;"></div>
+    </div>
     <div class="progress-row">
       <div class="progress-label" id="progress"></div>
       <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
     </div>
-
     <div class="card" id="card">
       <div id="diagramSlot"></div>
       <div class="type-pill" id="stepLabel"></div>
       <div class="step-text" id="stepText"></div>
       <div class="set-badge" id="setBadge"></div>
       <div id="timerBox" style="display:none;">
-        <div class="timer-display" id="timerDisplay"></div>
+        <div id="timerDisplayWrap" onclick="showTimerEdit()" style="cursor:pointer;">
+          <div class="timer-display" id="timerDisplay"></div>
+        </div>
+        <div id="timerEditBox" style="display:none; gap:8px; align-items:center; justify-content:center; margin:14px 0 6px;">
+          <input type="number" id="editMin" min="0" style="width:56px; text-align:center; padding:10px; border-radius:10px; background:var(--card-bg); border:1px solid var(--border); color:var(--text); font-size:16px;">
+          <span style="color:var(--muted); font-size:18px;">:</span>
+          <input type="number" id="editSec" min="0" max="59" style="width:56px; text-align:center; padding:10px; border-radius:10px; background:var(--card-bg); border:1px solid var(--border); color:var(--text); font-size:16px;">
+          <button class="secondary" style="padding:10px 14px; font-size:13px;" onclick="applyTimerEdit()">Set</button>
+        </div>
         <div class="timer-controls">
           <button class="secondary" onclick="toggleTimer()" id="timerToggleBtn">Pause</button>
           <button class="secondary" onclick="resetTimer()">Reset</button>
         </div>
       </div>
     </div>
-
     <div class="controls">
       <button class="secondary" onclick="prevStep()">⟵</button>
       <button class="read-btn" id="readBtn" onclick="readStep()">🔊</button>
       <button class="primary" style="margin-top:0;" onclick="nextStep()">Next ⟶</button>
     </div>
-
     <div class="footer-row">
       <div class="toggle">
         <input type="checkbox" id="autoReadToggle" checked>
-        <label for="autoReadToggle">Auto-read</label>
+        <label for="autoReadToggle" style="margin:0; text-transform:none; font-weight:400;">Auto-read</label>
       </div>
-      <button class="reset-link" onclick="resetAll()">New workout</button>
     </div>
   </div>
 </div>
 
 <script>
+/* ---------- Storage ---------- */
+const STORAGE_KEY = 'workoutRepo';
+function loadWorkouts(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }catch(e){ return []; }
+}
+function saveWorkouts(list){ localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+
+/* ---------- Navigation ---------- */
+let currentType = 'Run';
+let titleEdited = false;
+let currentWorkoutId = null;
+let sessionStartTime = null;
+
+function ordinal(n){
+  if(n > 3 && n < 21) return n + 'th';
+  switch(n % 10){ case 1: return n+'st'; case 2: return n+'nd'; case 3: return n+'rd'; default: return n+'th'; }
+}
+function updateAutoTitle(){
+  if(titleEdited) return;
+  const dateVal = document.getElementById('addDate').value;
+  if(!dateVal) return;
+  const d = new Date(dateVal + 'T00:00:00');
+  const month = d.toLocaleDateString('en-US', { month:'long' });
+  const label = currentType === 'Run' ? 'Run' : 'Strength Training';
+  document.getElementById('addTitle').value = `${month} ${ordinal(d.getDate())} ${label}`;
+}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goHome(){ window.speechSynthesis.cancel(); clearInterval(timerInterval); renderHome(); showScreen('screenHome'); }
+function goData(){ window.speechSynthesis.cancel(); clearInterval(timerInterval); renderData(); showScreen('screenData'); }
+function goAdd(){
+  titleEdited = false;
+  document.getElementById('addDate').valueAsDate = new Date();
+  document.getElementById('addRaw').value = '';
+  setType('Run');
+  updateAutoTitle();
+  showScreen('screenAdd');
+}
+function setType(t){
+  currentType = t;
+  document.getElementById('typeRun').classList.toggle('active', t==='Run');
+  document.getElementById('typeStrength').classList.toggle('active', t==='Strength');
+  updateAutoTitle();
+}
+
+/* ---------- Home list ---------- */
+function renderHome(){
+  const list = loadWorkouts().sort((a,b) => new Date(b.date) - new Date(a.date));
+  const el = document.getElementById('wlist');
+  if(!list.length){
+    el.innerHTML = `<div class="empty">No workouts yet. Tap "+ New Workout" to add your first one.</div>`;
+    return;
+  }
+  el.innerHTML = list.map(w => {
+    const dot = w.type === 'Run' ? 'var(--run)' : 'var(--exercise)';
+    const metaBits = [];
+    if(w.type === 'Run' && w.distance) metaBits.push(`${w.distance} mi`);
+    if(w.duration) metaBits.push(`${w.duration} min`);
+    metaBits.push(formatDate(w.date));
+    return `<div class="wcard">
+      <div class="dot" style="background:${dot};" onclick="openWorkout('${w.id}')"></div>
+      <div class="info" onclick="openWorkout('${w.id}')">
+        <div class="title">${escapeHtml(w.title)}</div>
+        <div class="meta">${metaBits.join(' · ')}</div>
+      </div>
+      <button class="icon-btn" style="width:36px; height:36px; font-size:14px; flex-shrink:0;" onclick="confirmDelete('${w.id}')">🗑️</button>
+      <div class="chev" onclick="openWorkout('${w.id}')">›</div>
+    </div>`;
+  }).join('');
+}
+function formatDate(d){
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+}
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+let confirmCallback = null;
+function showConfirm(msg, cb){
+  document.getElementById('confirmMessage').innerText = msg;
+  confirmCallback = cb;
+  document.getElementById('confirmOverlay').style.display = 'flex';
+}
+function hideConfirm(){ document.getElementById('confirmOverlay').style.display = 'none'; confirmCallback = null; }
+function confirmYes(){ if(confirmCallback) confirmCallback(); hideConfirm(); }
+function confirmDelete(id){ showConfirm("Delete this workout? This can't be undone.", () => deleteWorkout(id)); }
+function deleteWorkout(id){
+  const list = loadWorkouts().filter(w => w.id !== id);
+  saveWorkouts(list);
+  renderHome();
+}
+
+/* ---------- Save new workout ---------- */
+function saveWorkout(){
+  const title = document.getElementById('addTitle').value.trim() || 'Workout';
+  const date = document.getElementById('addDate').value || new Date().toISOString().slice(0,10);
+  const raw = document.getElementById('addRaw').value.trim();
+  if(!raw){ alert('Paste the tagged workout text first.'); return; }
+  const list = loadWorkouts();
+  list.push({ id: 'w' + Date.now(), title, date, type: currentType, distance: null, duration: null, raw });
+  saveWorkouts(list);
+  goHome();
+}
+
+/* ---------- Data tab ---------- */
+function getMonday(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+}
+function weekKey(dt){ return dt.toISOString().slice(0,10); }
+function weekLabel(dt){ return dt.toLocaleDateString('en-US', { month:'short', day:'numeric' }); }
+
+function renderData(){
+  const list = loadWorkouts();
+  const el = document.getElementById('dataContent');
+  if(!list.length){
+    el.innerHTML = `<div class="empty">No data yet. Once you log a few workouts, your weekly trends show up here.</div>`;
+    return;
+  }
+  // build last 8 week buckets
+  const today = new Date();
+  const thisMonday = getMonday(today.toISOString().slice(0,10));
+  const weeks = [];
+  for(let i = 7; i >= 0; i--){
+    const d = new Date(thisMonday);
+    d.setDate(d.getDate() - i*7);
+    weeks.push({ key: weekKey(d), label: weekLabel(d), miles: 0, minutes: 0, sessions: 0 });
+  }
+  list.forEach(w => {
+    const mon = weekKey(getMonday(w.date));
+    const bucket = weeks.find(x => x.key === mon);
+    if(!bucket) return;
+    if(w.type === 'Run' && w.distance) bucket.miles += w.distance;
+    if(w.duration) bucket.minutes += w.duration;
+    bucket.sessions += 1;
+  });
+
+  const totalMiles = weeks.reduce((s,w) => s + w.miles, 0);
+  const totalMinutes = weeks.reduce((s,w) => s + w.minutes, 0);
+  const totalSessions = weeks.reduce((s,w) => s + w.sessions, 0);
+
+  el.innerHTML = `
+    <div class="chart-card">
+      <div class="chart-title">Weekly Miles</div>
+      <div class="chart-total">${totalMiles.toFixed(1)} mi <span style="font-size:13px; color:var(--muted); font-weight:500;">last 8 weeks</span></div>
+      ${drawChart(weeks.map(w=>w.miles), weeks.map(w=>w.label), 'var(--run)')}
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Weekly Training Minutes</div>
+      <div class="chart-total">${totalMinutes} min <span style="font-size:13px; color:var(--muted); font-weight:500;">last 8 weeks</span></div>
+      ${drawChart(weeks.map(w=>w.minutes), weeks.map(w=>w.label), 'var(--exercise)')}
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Sessions Logged</div>
+      <div class="chart-total">${totalSessions} <span style="font-size:13px; color:var(--muted); font-weight:500;">last 8 weeks</span></div>
+      ${drawChart(weeks.map(w=>w.sessions), weeks.map(w=>w.label), 'var(--detail)')}
+    </div>
+  `;
+}
+
+function drawChart(values, labels, color){
+  const w = 300, h = 120, pad = 10;
+  const max = Math.max(...values, 1);
+  const stepX = (w - pad*2) / (values.length - 1);
+  const points = values.map((v,i) => {
+    const x = pad + i*stepX;
+    const y = h - pad - (v/max)*(h - pad*2);
+    return `${x},${y}`;
+  }).join(' ');
+  const dots = values.map((v,i) => {
+    const x = pad + i*stepX;
+    const y = h - pad - (v/max)*(h - pad*2);
+    return `<circle cx="${x}" cy="${y}" r="3" fill="${color}"/>`;
+  }).join('');
+  const firstLabel = labels[0], lastLabel = labels[labels.length-1];
+  return `<svg viewBox="0 0 ${w} ${h+20}" style="width:100%; height:auto;">
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+    <text x="${pad}" y="${h+16}" font-size="10" fill="#83848c">${firstLabel}</text>
+    <text x="${w-pad}" y="${h+16}" font-size="10" fill="#83848c" text-anchor="end">${lastLabel}</text>
+  </svg>`;
+}
+
+/* ---------- Player (reused reader logic) ---------- */
 let steps = [];
 let idx = 0;
 let timerInterval = null;
@@ -157,7 +482,6 @@ window.speechSynthesis.onvoiceschanged = pickVoice;
 pickVoice();
 
 function vibrate(ms){ if(navigator.vibrate) navigator.vibrate(ms); }
-
 function speakText(text, opts={}){
   if(opts.interrupt) window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
@@ -167,22 +491,9 @@ function speakText(text, opts={}){
   if(opts.onend) utter.onend = opts.onend;
   window.speechSynthesis.speak(utter);
 }
-
-function paceStrToSeconds(str){
-  const m = str.match(/(\d+):(\d+)/);
-  if(!m) return null;
-  return parseInt(m[1])*60 + parseInt(m[2]);
-}
-function secondsToPaceStr(sec){
-  const m = Math.floor(sec/60), s = Math.round(sec%60);
-  return `${m}:${s.toString().padStart(2,'0')}`;
-}
-function secondsToPaceSpeech(sec){
-  const m = Math.floor(sec/60), s = Math.round(sec%60);
-  let out = `${m} minute${m==1?'':'s'}`;
-  if(s > 0) out += ` ${s} second${s==1?'':'s'}`;
-  return out;
-}
+function paceStrToSeconds(str){ const m = str.match(/(\d+):(\d+)/); return m ? parseInt(m[1])*60+parseInt(m[2]) : null; }
+function secondsToPaceStr(sec){ const m=Math.floor(sec/60), s=Math.round(sec%60); return `${m}:${s.toString().padStart(2,'0')}`; }
+function secondsToPaceSpeech(sec){ const m=Math.floor(sec/60), s=Math.round(sec%60); let out=`${m} minute${m==1?'':'s'}`; if(s>0) out+=` ${s} second${s==1?'':'s'}`; return out; }
 
 const DIAGRAMS = {
   'box squat': `<svg class="diagram" viewBox="0 0 100 100"><rect x="25" y="70" width="50" height="18" fill="none" stroke="#83848c" stroke-width="3"/><circle cx="50" cy="28" r="8" fill="none" stroke="#f7f7fa" stroke-width="3"/><path d="M50 36 L50 62 M50 40 L35 55 M50 40 L65 55 M50 62 L38 88 M50 62 L62 88" stroke="#f7f7fa" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
@@ -199,7 +510,6 @@ function findDiagram(text){
   for(const key in DIAGRAMS){ if(t.includes(key)) return DIAGRAMS[key]; }
   return null;
 }
-
 function humanize(text){
   return text
     .replace(/(\d+)\s*x\s*(\d+)/gi, (m,a,b) => `${a} sets of ${b} reps`)
@@ -213,7 +523,6 @@ function humanize(text){
     .replace(/\s+/g, ' ')
     .trim();
 }
-
 function parseDuration(str){
   if(!str) return null;
   const min = str.match(/(\d+)\s*'/);
@@ -223,7 +532,6 @@ function parseDuration(str){
   if(/^\d+$/.test(str.trim())) return parseInt(str.trim());
   return null;
 }
-
 function parseWorkout(raw){
   const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
   const parsed = [];
@@ -233,21 +541,15 @@ function parseWorkout(raw){
     const type = m[1].toUpperCase();
     let parts = m[2].split('|').map(s => s ? s.trim() : s);
     let displayPart = parts[0], spokenPart = parts[1], durationPart = parts[2], pacePart = parts[3];
-
     let paceKmSec = null, paceMileSec = null;
-    if(pacePart){
-      paceKmSec = paceStrToSeconds(pacePart);
-      if(paceKmSec) paceMileSec = paceKmSec * 1.60934;
-    }
-
+    if(pacePart){ paceKmSec = paceStrToSeconds(pacePart); if(paceKmSec) paceMileSec = paceKmSec * 1.60934; }
     if(type === 'REST'){
       const seconds = parseDuration(durationPart) || parseDuration(displayPart) || 60;
       parsed.push({ type:'REST', raw:displayPart, spoken: spokenPart || `Rest, ${humanize(displayPart)}`, seconds });
     } else {
       const seconds = parseDuration(durationPart);
       const label = spokenPart || humanize(displayPart);
-      let spoken = label;
-      let paceBadge = null;
+      let spoken = label, paceBadge = null;
       if(paceKmSec){
         spoken = `${label}. ${secondsToPaceSpeech(paceMileSec)} per mile, ${secondsToPaceSpeech(paceKmSec)} per kilometer.`;
         paceBadge = `${secondsToPaceStr(paceKmSec)} /km  ·  ${secondsToPaceStr(paceMileSec)} /mi`;
@@ -258,14 +560,17 @@ function parseWorkout(raw){
   return parsed;
 }
 
-function loadWorkout(){
-  const raw = document.getElementById('raw').value.trim();
-  if(!raw) return;
-  steps = parseWorkout(raw);
-  if(!steps.length){ alert('No tagged lines found. Lines must start with EXERCISE:, DETAIL:, SET:, or REST:'); return; }
+function openWorkout(id){
+  const list = loadWorkouts();
+  const w = list.find(x => x.id === id);
+  if(!w) return;
+  steps = parseWorkout(w.raw);
+  if(!steps.length){ alert('This workout has no valid tagged lines.'); return; }
   idx = 0;
-  document.getElementById('input').style.display = 'none';
-  document.getElementById('viewer').style.display = 'flex';
+  currentWorkoutId = id;
+  sessionStartTime = Date.now();
+  document.getElementById('playerTitle').innerText = w.title;
+  showScreen('screenPlayer');
   renderStep();
 }
 
@@ -294,30 +599,21 @@ function renderStep(){
   } else {
     timerBox.style.display = 'none';
   }
-
-  if(document.getElementById('autoReadToggle').checked){
-    readStep();
-  }
+  if(document.getElementById('autoReadToggle').checked) readStep();
 }
 
 function transitionTo(newIdx){
   const card = document.getElementById('card');
   card.classList.add('fade-out');
   vibrate(15);
-  setTimeout(() => {
-    idx = newIdx;
-    renderStep();
-    card.classList.remove('fade-out');
-  }, 140);
+  setTimeout(() => { idx = newIdx; renderStep(); card.classList.remove('fade-out'); }, 140);
 }
-
 function readStep(){
   const step = steps[idx];
   const btn = document.getElementById('readBtn');
   btn.classList.add('speaking');
   speakText(step.spoken, { interrupt:true, onend: () => btn.classList.remove('speaking') });
 }
-
 function startTimer(seconds){
   timerSeconds = seconds; timerTotal = seconds; timerRunning = true;
   updateTimerDisplay();
@@ -325,42 +621,95 @@ function startTimer(seconds){
     if(!timerRunning) return;
     timerSeconds--;
     updateTimerDisplay();
-
-    if(timerSeconds === 30 || timerSeconds === 10){
-      vibrate(20);
-      speakText(`${timerSeconds} seconds left`);
-    } else if(timerSeconds === 3 || timerSeconds === 2 || timerSeconds === 1){
-      vibrate(20);
-      speakText(`${timerSeconds}`);
-    }
-
+    if(timerSeconds === 30 || timerSeconds === 10){ vibrate(20); speakText(`${timerSeconds} seconds left`); }
+    else if(timerSeconds === 3 || timerSeconds === 2 || timerSeconds === 1){ vibrate(20); speakText(`${timerSeconds}`); }
     if(timerSeconds <= 0){
       clearInterval(timerInterval);
       vibrate([100,50,100]);
-      speakText("Time's up", { interrupt:true, onend: () => {
-        if(idx < steps.length - 1) transitionTo(idx + 1);
-      }});
+      speakText("Time's up", { interrupt:true, onend: () => { if(idx < steps.length - 1) transitionTo(idx + 1); } });
     }
   }, 1000);
 }
 function updateTimerDisplay(){
-  const m = Math.floor(Math.max(timerSeconds,0)/60);
-  const s = Math.max(timerSeconds,0)%60;
+  const m = Math.floor(Math.max(timerSeconds,0)/60), s = Math.max(timerSeconds,0)%60;
   document.getElementById('timerDisplay').innerText = `${m}:${s.toString().padStart(2,'0')}`;
 }
-function toggleTimer(){
-  vibrate(10);
-  timerRunning = !timerRunning;
+function toggleTimer(){ vibrate(10); timerRunning = !timerRunning; document.getElementById('timerToggleBtn').innerText = timerRunning ? 'Pause' : 'Resume'; }
+function resetTimer(){ vibrate(10); clearInterval(timerInterval); startTimer(timerTotal); }
+
+let timerWasRunningBeforeEdit = false;
+function showTimerEdit(){
+  timerWasRunningBeforeEdit = timerRunning;
+  timerRunning = false;
+  document.getElementById('editMin').value = Math.floor(timerSeconds/60);
+  document.getElementById('editSec').value = timerSeconds%60;
+  document.getElementById('timerDisplayWrap').style.display = 'none';
+  document.getElementById('timerEditBox').style.display = 'flex';
+}
+function applyTimerEdit(){
+  const m = parseInt(document.getElementById('editMin').value) || 0;
+  const s = parseInt(document.getElementById('editSec').value) || 0;
+  timerSeconds = m*60 + s;
+  timerTotal = timerSeconds;
+  updateTimerDisplay();
+  document.getElementById('timerEditBox').style.display = 'none';
+  document.getElementById('timerDisplayWrap').style.display = 'block';
+  timerRunning = timerWasRunningBeforeEdit;
   document.getElementById('timerToggleBtn').innerText = timerRunning ? 'Pause' : 'Resume';
 }
-function resetTimer(){ vibrate(10); clearInterval(timerInterval); startTimer(timerTotal); }
-function nextStep(){ if(idx < steps.length - 1) transitionTo(idx+1); }
-function prevStep(){ if(idx > 0) transitionTo(idx-1); }
-function resetAll(){
-  window.speechSynthesis.cancel(); clearInterval(timerInterval);
-  document.getElementById('viewer').style.display = 'none';
-  document.getElementById('input').style.display = 'block';
+function nextStep(){
+  if(idx < steps.length - 1){ transitionTo(idx+1); }
+  else { completeWorkout(); }
 }
+function prevStep(){ if(idx > 0) transitionTo(idx-1); }
+
+/* ---------- Completion ---------- */
+function completeWorkout(){
+  window.speechSynthesis.cancel();
+  clearInterval(timerInterval);
+  const list = loadWorkouts();
+  const w = list.find(x => x.id === currentWorkoutId);
+  const elapsedMin = sessionStartTime ? Math.max(1, Math.round((Date.now() - sessionStartTime) / 60000)) : '';
+  document.getElementById('completeDistanceWrap').style.display = (w && w.type === 'Run') ? 'block' : 'none';
+  document.getElementById('completeDistance').value = (w && w.distance) || '';
+  document.getElementById('completeDuration').value = elapsedMin;
+  showScreen('screenComplete');
+  launchConfetti();
+}
+function finishWorkout(skip){
+  if(!skip && currentWorkoutId){
+    const list = loadWorkouts();
+    const w = list.find(x => x.id === currentWorkoutId);
+    if(w){
+      const d = parseFloat(document.getElementById('completeDistance').value);
+      const dur = parseInt(document.getElementById('completeDuration').value);
+      if(!isNaN(d)) w.distance = d;
+      if(!isNaN(dur)) w.duration = dur;
+      saveWorkouts(list);
+    }
+  }
+  currentWorkoutId = null;
+  goHome();
+}
+function launchConfetti(){
+  const layer = document.getElementById('confettiLayer');
+  layer.innerHTML = '';
+  const colors = ['#5b8def','#a679f0','#37c982','#f0a63a','#f76c6c'];
+  for(let i = 0; i < 40; i++){
+    const p = document.createElement('div');
+    const color = colors[Math.floor(Math.random()*colors.length)];
+    const left = Math.random()*100;
+    const delay = Math.random()*0.4;
+    const duration = 1.8 + Math.random()*1.2;
+    const size = 6 + Math.random()*6;
+    p.style.cssText = `position:absolute; top:-20px; left:${left}%; width:${size}px; height:${size}px; background:${color}; border-radius:${Math.random()>0.5?'50%':'2px'}; opacity:0.9; animation:confettiFall ${duration}s ease-in ${delay}s forwards;`;
+    layer.appendChild(p);
+  }
+  setTimeout(() => { layer.innerHTML = ''; }, 3200);
+}
+
+/* ---------- Init ---------- */
+renderHome();
 </script>
 </body>
 </html>
