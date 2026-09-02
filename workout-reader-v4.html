@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Workout Reader</title>
+<style>
+  :root{
+    --bg1:#0a0b0f; --bg2:#14151c;
+    --exercise:#5b8def; --detail:#a679f0; --rest:#37c982;
+    --text:#f7f7fa; --muted:#83848c; --border:rgba(255,255,255,.08);
+    --card-bg:rgba(255,255,255,.045);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;
+    background:radial-gradient(circle at 30% 0%, #1c1f2c, var(--bg1) 60%);
+    color:var(--text); min-height:100vh; display:flex; flex-direction:column;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{padding:18px; flex:1; display:flex; flex-direction:column; max-width:480px; margin:0 auto; width:100%;}
+  h1{font-size:12px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin:4px 0 18px; text-align:center; font-weight:700;}
+
+  textarea{
+    width:100%; min-height:180px; background:var(--card-bg); color:var(--text);
+    border:1px solid var(--border); border-radius:16px; padding:16px; font-size:14px;
+    resize:vertical; line-height:1.6; font-family:ui-monospace,monospace;
+    backdrop-filter:blur(10px);
+  }
+  .hint{color:var(--muted); font-size:13px; margin-bottom:12px; line-height:1.5;}
+  button{border:none; border-radius:16px; font-weight:700; cursor:pointer; font-family:inherit; transition:transform .08s ease;}
+  button:active{transform:scale(.95);}
+  .primary{
+    background:linear-gradient(135deg,#6c8cff,#5b8def); color:white; width:100%;
+    padding:17px; font-size:16px; margin-top:14px; box-shadow:0 6px 20px rgba(91,141,239,.35);
+  }
+  .secondary{background:var(--card-bg); color:var(--text); border:1px solid var(--border); backdrop-filter:blur(10px);}
+
+  #viewer{display:none; flex:1; flex-direction:column;}
+
+  .progress-row{display:flex; align-items:center; gap:10px; margin-bottom:18px;}
+  .progress-label{font-size:12px; color:var(--muted); font-weight:600; white-space:nowrap;}
+  .progress-track{flex:1; height:4px; background:var(--border); border-radius:4px; overflow:hidden;}
+  .progress-fill{height:100%; border-radius:4px; transition:width .35s cubic-bezier(.4,0,.2,1);}
+
+  .card{
+    flex:1; border-radius:26px; padding:30px 22px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; min-height:300px;
+    background:var(--card-bg); border:1.5px solid var(--border); backdrop-filter:blur(16px);
+    position:relative; overflow:hidden; transition:opacity .22s ease, transform .22s ease;
+  }
+  .card::before{
+    content:''; position:absolute; top:0; left:0; right:0; height:4px;
+    background:var(--type-color, var(--exercise));
+  }
+  .card.fade-out{opacity:0; transform:translateY(8px) scale(.98);}
+
+  .type-pill{
+    display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px;
+    font-size:11px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase;
+    background:color-mix(in srgb, var(--type-color) 18%, transparent);
+    color:var(--type-color); margin-bottom:16px;
+  }
+  .diagram{width:88px; height:88px; margin-bottom:6px; opacity:.85;}
+  .step-text{font-size:22px; font-weight:700; line-height:1.45; white-space:pre-wrap;}
+  .set-badge{font-size:13px; color:var(--muted); font-weight:600; margin-top:8px;}
+
+  .timer-display{font-size:58px; font-weight:800; font-variant-numeric:tabular-nums; margin:14px 0 6px; color:var(--rest);}
+  .timer-ring{width:140px; height:140px; margin:6px 0;}
+  .timer-controls{display:flex; gap:10px; margin-top:10px;}
+  .timer-controls button{padding:11px 20px; font-size:14px; border-radius:12px;}
+
+  .controls{display:flex; gap:10px; margin-top:18px;}
+  .controls button{flex:1; padding:17px; font-size:15px; border-radius:16px;}
+  .read-btn{
+    background:var(--card-bg); color:var(--text); border:1px solid var(--border);
+    flex:0 0 58px !important; font-size:21px !important; padding:17px 0 !important;
+  }
+  .read-btn.speaking{background:linear-gradient(135deg,#6c8cff,#5b8def); animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(91,141,239,.5);} 50%{box-shadow:0 0 0 8px rgba(91,141,239,0);}}
+
+  .footer-row{display:flex; align-items:center; justify-content:space-between; margin-top:16px; padding:0 4px;}
+  .toggle{display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px;}
+  .toggle input{accent-color:var(--exercise); width:16px; height:16px;}
+  .reset-link{color:var(--muted); font-size:13px; background:none; border:none; text-decoration:underline; padding:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Workout Reader</h1>
+
+  <div id="input">
+    <div class="hint">Paste the tagged workout text. Repeated sets should be written as individual SET lines with REST after each — not bundled together.</div>
+    <textarea id="raw" placeholder="EXERCISE: Pause Barbell Box Squat | ...
+SET: 1 of 3 | Set 1 of 3, ...
+REST: 2' | Rest 2 minutes
+SET: 2 of 3 | Set 2 of 3, ...
+REST: 2' | Rest 2 minutes"></textarea>
+    <button class="primary" onclick="loadWorkout()">Load Workout</button>
+  </div>
+
+  <div id="viewer">
+    <div class="progress-row">
+      <div class="progress-label" id="progress"></div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="card" id="card">
+      <div id="diagramSlot"></div>
+      <div class="type-pill" id="stepLabel"></div>
+      <div class="step-text" id="stepText"></div>
+      <div class="set-badge" id="setBadge"></div>
+      <div id="timerBox" style="display:none;">
+        <div class="timer-display" id="timerDisplay"></div>
+        <div class="timer-controls">
+          <button class="secondary" onclick="toggleTimer()" id="timerToggleBtn">Pause</button>
+          <button class="secondary" onclick="resetTimer()">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="secondary" onclick="prevStep()">⟵</button>
+      <button class="read-btn" id="readBtn" onclick="readStep()">🔊</button>
+      <button class="primary" style="margin-top:0;" onclick="nextStep()">Next ⟶</button>
+    </div>
+
+    <div class="footer-row">
+      <div class="toggle">
+        <input type="checkbox" id="autoReadToggle" checked>
+        <label for="autoReadToggle">Auto-read</label>
+      </div>
+      <button class="reset-link" onclick="resetAll()">New workout</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let steps = [];
+let idx = 0;
+let timerInterval = null;
+let timerSeconds = 0, timerTotal = 0, timerRunning = false;
+let bestVoice = null;
+
+const TYPE_COLORS = { EXERCISE: 'var(--exercise)', DETAIL: 'var(--detail)', SET: 'var(--detail)', REST: 'var(--rest)' };
+const TYPE_LABELS = { EXERCISE: 'Exercise', DETAIL: 'Detail', SET: 'Set', REST: 'Rest' };
+
+function pickVoice(){
+  const voices = window.speechSynthesis.getVoices();
+  bestVoice = voices.find(v => /premium/i.test(v.name) && v.lang.startsWith('en'))
+    || voices.find(v => /enhanced/i.test(v.name) && v.lang.startsWith('en'))
+    || voices.find(v => /Google US English|Samantha|Aria|Natural/i.test(v.name) && v.lang.startsWith('en'))
+    || voices.find(v => v.lang === 'en-US')
+    || voices[0] || null;
+}
+window.speechSynthesis.onvoiceschanged = pickVoice;
+pickVoice();
+
+function vibrate(ms){ if(navigator.vibrate) navigator.vibrate(ms); }
+
+function speakText(text, opts={}){
+  if(opts.interrupt) window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = opts.rate || 0.78;
+  utter.pitch = 1.0;
+  if(bestVoice) utter.voice = bestVoice;
+  if(opts.onend) utter.onend = opts.onend;
+  window.speechSynthesis.speak(utter);
+}
+
+function paceStrToSeconds(str){
+  const m = str.match(/(\d+):(\d+)/);
+  if(!m) return null;
+  return parseInt(m[1])*60 + parseInt(m[2]);
+}
+function secondsToPaceStr(sec){
+  const m = Math.floor(sec/60), s = Math.round(sec%60);
+  return `${m}:${s.toString().padStart(2,'0')}`;
+}
+function secondsToPaceSpeech(sec){
+  const m = Math.floor(sec/60), s = Math.round(sec%60);
+  let out = `${m} minute${m==1?'':'s'}`;
+  if(s > 0) out += ` ${s} second${s==1?'':'s'}`;
+  return out;
+}
+
+const DIAGRAMS = {
+  'box squat': `<svg class="diagram" viewBox="0 0 100 100"><rect x="25" y="70" width="50" height="18" fill="none" stroke="#83848c" stroke-width="3"/><circle cx="50" cy="28" r="8" fill="none" stroke="#f7f7fa" stroke-width="3"/><path d="M50 36 L50 62 M50 40 L35 55 M50 40 L65 55 M50 62 L38 88 M50 62 L62 88" stroke="#f7f7fa" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
+  'sled push': `<svg class="diagram" viewBox="0 0 100 100"><rect x="60" y="55" width="22" height="20" fill="none" stroke="#83848c" stroke-width="3"/><circle cx="30" cy="30" r="7" fill="none" stroke="#f7f7fa" stroke-width="3"/><path d="M30 37 L38 58 L58 62 M38 58 L28 88 M38 58 L48 88" stroke="#f7f7fa" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
+  'sled drag': `<svg class="diagram" viewBox="0 0 100 100"><rect x="65" y="60" width="20" height="14" fill="none" stroke="#83848c" stroke-width="3"/><line x1="65" y1="67" x2="45" y2="55" stroke="#83848c" stroke-width="2"/><circle cx="35" cy="30" r="7" fill="none" stroke="#f7f7fa" stroke-width="3"/><path d="M35 37 L40 58 L45 55 M40 58 L30 88 M40 58 L50 88" stroke="#f7f7fa" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
+  'plate push': `<svg class="diagram" viewBox="0 0 100 100"><ellipse cx="70" cy="70" rx="14" ry="6" fill="none" stroke="#83848c" stroke-width="3"/><circle cx="35" cy="35" r="7" fill="none" stroke="#f7f7fa" stroke-width="3"/><path d="M35 42 L45 60 L60 66 M45 60 L35 88 M45 60 L55 88" stroke="#f7f7fa" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
+  'box jump': `<svg class="diagram" viewBox="0 0 100 100"><rect x="55" y="65" width="30" height="23" fill="none" stroke="#83848c" stroke-width="3"/><circle cx="30" cy="35" r="7" fill="none" stroke="#f7f7fa" stroke-width="3"/><path d="M30 42 L38 58 M38 58 L25 50 M38 58 L48 48 M38 58 L30 78 M38 58 L48 72" stroke="#f7f7fa" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
+  'broad jump': `<svg class="diagram" viewBox="0 0 100 100"><line x1="10" y1="85" x2="90" y2="85" stroke="#83848c" stroke-width="2" stroke-dasharray="4"/><circle cx="25" cy="35" r="7" fill="none" stroke="#f7f7fa" stroke-width="3"/><path d="M25 42 L45 55 L75 50 M45 55 L40 78 M45 55 L65 75" stroke="#f7f7fa" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
+  'air squat': `<svg class="diagram" viewBox="0 0 100 100"><circle cx="50" cy="30" r="8" fill="none" stroke="#f7f7fa" stroke-width="3"/><path d="M50 38 L50 60 M50 42 L35 52 M50 42 L65 52 M50 60 L38 85 M50 60 L62 85" stroke="#f7f7fa" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
+  'assault bike': `<svg class="diagram" viewBox="0 0 100 100"><circle cx="30" cy="70" r="16" fill="none" stroke="#83848c" stroke-width="3"/><circle cx="70" cy="70" r="16" fill="none" stroke="#83848c" stroke-width="3"/><circle cx="50" cy="35" r="7" fill="none" stroke="#f7f7fa" stroke-width="3"/><path d="M50 42 L48 60 L30 70 M48 60 L65 55" stroke="#f7f7fa" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`
+};
+function findDiagram(text){
+  const t = text.toLowerCase();
+  for(const key in DIAGRAMS){ if(t.includes(key)) return DIAGRAMS[key]; }
+  return null;
+}
+
+function humanize(text){
+  return text
+    .replace(/(\d+)\s*x\s*(\d+)/gi, (m,a,b) => `${a} sets of ${b} reps`)
+    .replace(/(\d+)'\s*(?!s)/g, (m,n) => `${n} minute${n=='1'?'':'s'} `)
+    .replace(/(\d+)"/g, (m,n) => `${n} second${n=='1'?'':'s'}`)
+    .replace(/btw/gi, 'between')
+    .replace(/%/g, ' percent')
+    .replace(/@/g, ' at ')
+    .replace(/lbs/gi, 'pounds')
+    .replace(/kgs/gi, 'kilos')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseDuration(str){
+  if(!str) return null;
+  const min = str.match(/(\d+)\s*'/);
+  const sec = str.match(/(\d+)\s*"/);
+  if(min) return parseInt(min[1]) * 60;
+  if(sec) return parseInt(sec[1]);
+  if(/^\d+$/.test(str.trim())) return parseInt(str.trim());
+  return null;
+}
+
+function parseWorkout(raw){
+  const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  const parsed = [];
+  for(const line of lines){
+    const m = line.match(/^(EXERCISE|DETAIL|SET|REST):\s*(.*)$/i);
+    if(!m) continue;
+    const type = m[1].toUpperCase();
+    let parts = m[2].split('|').map(s => s ? s.trim() : s);
+    let displayPart = parts[0], spokenPart = parts[1], durationPart = parts[2], pacePart = parts[3];
+
+    let paceKmSec = null, paceMileSec = null;
+    if(pacePart){
+      paceKmSec = paceStrToSeconds(pacePart);
+      if(paceKmSec) paceMileSec = paceKmSec * 1.60934;
+    }
+
+    if(type === 'REST'){
+      const seconds = parseDuration(durationPart) || parseDuration(displayPart) || 60;
+      parsed.push({ type:'REST', raw:displayPart, spoken: spokenPart || `Rest, ${humanize(displayPart)}`, seconds });
+    } else {
+      const seconds = parseDuration(durationPart);
+      const label = spokenPart || humanize(displayPart);
+      let spoken = label;
+      let paceBadge = null;
+      if(paceKmSec){
+        spoken = `${label}. ${secondsToPaceSpeech(paceMileSec)} per mile, ${secondsToPaceSpeech(paceKmSec)} per kilometer.`;
+        paceBadge = `${secondsToPaceStr(paceKmSec)} /km  ·  ${secondsToPaceStr(paceMileSec)} /mi`;
+      }
+      parsed.push({ type, raw: displayPart, spoken, diagram: findDiagram(displayPart), seconds, paceBadge });
+    }
+  }
+  return parsed;
+}
+
+function loadWorkout(){
+  const raw = document.getElementById('raw').value.trim();
+  if(!raw) return;
+  steps = parseWorkout(raw);
+  if(!steps.length){ alert('No tagged lines found. Lines must start with EXERCISE:, DETAIL:, SET:, or REST:'); return; }
+  idx = 0;
+  document.getElementById('input').style.display = 'none';
+  document.getElementById('viewer').style.display = 'flex';
+  renderStep();
+}
+
+function renderStep(){
+  clearInterval(timerInterval);
+  timerRunning = false;
+  const step = steps[idx];
+  const card = document.getElementById('card');
+  const timerBox = document.getElementById('timerBox');
+  const diagramSlot = document.getElementById('diagramSlot');
+  const setBadge = document.getElementById('setBadge');
+
+  card.style.setProperty('--type-color', TYPE_COLORS[step.type] || 'var(--exercise)');
+  document.getElementById('progress').innerText = `${idx+1} / ${steps.length}`;
+  document.getElementById('progressFill').style.width = `${((idx+1)/steps.length)*100}%`;
+  document.getElementById('progressFill').style.background = TYPE_COLORS[step.type] || 'var(--exercise)';
+  document.getElementById('stepLabel').innerText = TYPE_LABELS[step.type] || step.type;
+  document.getElementById('stepText').innerText = step.raw;
+  diagramSlot.innerHTML = step.diagram || '';
+  setBadge.innerText = step.paceBadge || '';
+
+  if(step.seconds){
+    timerBox.style.display = 'block';
+    document.getElementById('timerDisplay').style.color = TYPE_COLORS[step.type] || 'var(--rest)';
+    startTimer(step.seconds);
+  } else {
+    timerBox.style.display = 'none';
+  }
+
+  if(document.getElementById('autoReadToggle').checked){
+    readStep();
+  }
+}
+
+function transitionTo(newIdx){
+  const card = document.getElementById('card');
+  card.classList.add('fade-out');
+  vibrate(15);
+  setTimeout(() => {
+    idx = newIdx;
+    renderStep();
+    card.classList.remove('fade-out');
+  }, 140);
+}
+
+function readStep(){
+  const step = steps[idx];
+  const btn = document.getElementById('readBtn');
+  btn.classList.add('speaking');
+  speakText(step.spoken, { interrupt:true, onend: () => btn.classList.remove('speaking') });
+}
+
+function startTimer(seconds){
+  timerSeconds = seconds; timerTotal = seconds; timerRunning = true;
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    if(!timerRunning) return;
+    timerSeconds--;
+    updateTimerDisplay();
+
+    if(timerSeconds === 30 || timerSeconds === 10){
+      vibrate(20);
+      speakText(`${timerSeconds} seconds left`);
+    } else if(timerSeconds === 3 || timerSeconds === 2 || timerSeconds === 1){
+      vibrate(20);
+      speakText(`${timerSeconds}`);
+    }
+
+    if(timerSeconds <= 0){
+      clearInterval(timerInterval);
+      vibrate([100,50,100]);
+      speakText("Time's up", { interrupt:true, onend: () => {
+        if(idx < steps.length - 1) transitionTo(idx + 1);
+      }});
+    }
+  }, 1000);
+}
+function updateTimerDisplay(){
+  const m = Math.floor(Math.max(timerSeconds,0)/60);
+  const s = Math.max(timerSeconds,0)%60;
+  document.getElementById('timerDisplay').innerText = `${m}:${s.toString().padStart(2,'0')}`;
+}
+function toggleTimer(){
+  vibrate(10);
+  timerRunning = !timerRunning;
+  document.getElementById('timerToggleBtn').innerText = timerRunning ? 'Pause' : 'Resume';
+}
+function resetTimer(){ vibrate(10); clearInterval(timerInterval); startTimer(timerTotal); }
+function nextStep(){ if(idx < steps.length - 1) transitionTo(idx+1); }
+function prevStep(){ if(idx > 0) transitionTo(idx-1); }
+function resetAll(){
+  window.speechSynthesis.cancel(); clearInterval(timerInterval);
+  document.getElementById('viewer').style.display = 'none';
+  document.getElementById('input').style.display = 'block';
+}
+</script>
+</body>
+</html>
