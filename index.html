@@ -6,7 +6,7 @@
 <title>Workout Reader</title>
 <style>
   :root{
-    --bg1:#0a0b0f; --exercise:#5b8def; --detail:#a679f0; --rest:#37c982; --run:#f0a63a;
+    --bg1:#0a0b0f; --exercise:#5b8def; --detail:#a679f0; --rest:#37c982; --run:#f0a63a; --section:#f0d43a;
     --text:#f7f7fa; --muted:#83848c; --border:rgba(255,255,255,.08);
     --card-bg:rgba(255,255,255,.045);
   }
@@ -467,8 +467,8 @@ let timerInterval = null;
 let timerSeconds = 0, timerTotal = 0, timerRunning = false;
 let bestVoice = null;
 
-const TYPE_COLORS = { EXERCISE: 'var(--exercise)', DETAIL: 'var(--detail)', SET: 'var(--detail)', REST: 'var(--rest)' };
-const TYPE_LABELS = { EXERCISE: 'Exercise', DETAIL: 'Detail', SET: 'Set', REST: 'Rest' };
+const TYPE_COLORS = { EXERCISE: 'var(--exercise)', DETAIL: 'var(--detail)', SET: 'var(--detail)', REST: 'var(--rest)', SECTION: 'var(--section)' };
+const TYPE_LABELS = { EXERCISE: 'Exercise', DETAIL: 'Detail', SET: 'Set', REST: 'Rest', SECTION: 'Section' };
 
 function pickVoice(){
   const voices = window.speechSynthesis.getVoices();
@@ -536,7 +536,7 @@ function parseWorkout(raw){
   const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
   const parsed = [];
   for(const line of lines){
-    const m = line.match(/^(EXERCISE|DETAIL|SET|REST):\s*(.*)$/i);
+    const m = line.match(/^(EXERCISE|DETAIL|SET|REST|SECTION):\s*(.*)$/i);
     if(!m) continue;
     const type = m[1].toUpperCase();
     let parts = m[2].split('|').map(s => s ? s.trim() : s);
@@ -589,6 +589,8 @@ function renderStep(){
   document.getElementById('progressFill').style.background = TYPE_COLORS[step.type] || 'var(--exercise)';
   document.getElementById('stepLabel').innerText = TYPE_LABELS[step.type] || step.type;
   document.getElementById('stepText').innerText = step.raw;
+  document.getElementById('stepText').style.fontSize = step.type === 'SECTION' ? '30px' : '22px';
+  card.style.background = step.type === 'SECTION' ? 'linear-gradient(135deg, rgba(240,212,58,.14), rgba(240,212,58,.03))' : '';
   diagramSlot.innerHTML = step.diagram || '';
   setBadge.innerText = step.paceBadge || '';
 
