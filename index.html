@@ -518,11 +518,30 @@ const TYPE_LABELS = { EXERCISE: 'Exercise', DETAIL: 'Detail', SET: 'Set', REST: 
 
 function pickVoice(){
   const voices = window.speechSynthesis.getVoices();
-  bestVoice = voices.find(v => /premium/i.test(v.name) && v.lang.startsWith('en'))
-    || voices.find(v => /enhanced/i.test(v.name) && v.lang.startsWith('en'))
-    || voices.find(v => /Google US English|Samantha|Aria|Natural/i.test(v.name) && v.lang.startsWith('en'))
+  if(!voices.length) return;
+
+  const scoreVoice = (v) => {
+    const name = v.name || '';
+    let score = 0;
+    if(!v.lang.toLowerCase().startsWith('en')) return -1;
+    if(/premium/i.test(name)) score += 100;
+    else if(/enhanced/i.test(name)) score += 80;
+    // Known high-quality Apple neural/premium English voice names
+    if(/\b(Ava|Zoe|Evan|Nathan|Nicky|Samantha|Allison|Susan|Tom|Aaron|Nicole)\b/i.test(name)) score += 40;
+    if(/Google US English|Google UK English/i.test(name)) score += 20;
+    if(v.lang === 'en-US') score += 10;
+    else if(v.lang.toLowerCase().startsWith('en')) score += 5;
+    if(v.localService) score += 3; // on-device voices tend to sound better than remote defaults
+    return score;
+  };
+
+  bestVoice = voices
+    .map(v => ({ v, score: scoreVoice(v) }))
+    .filter(x => x.score >= 0)
+    .sort((a,b) => b.score - a.score)[0]?.v
     || voices.find(v => v.lang === 'en-US')
-    || voices[0] || null;
+    || voices[0]
+    || null;
 }
 window.speechSynthesis.onvoiceschanged = pickVoice;
 pickVoice();
@@ -662,28 +681,56 @@ function readStep(){
   btn.classList.add('speaking');
   speakText(step.spoken, { interrupt:true, onend: () => btn.classList.remove('speaking') });
 }
+let timerEndAt = null, timerRemainingAtPause = 0, timerCompleted = false, lastAnnouncedSecond = null;
+
 function startTimer(seconds){
-  timerSeconds = seconds; timerTotal = seconds; timerRunning = true;
-  updateTimerDisplay();
-  timerInterval = setInterval(() => {
-    if(!timerRunning) return;
-    timerSeconds--;
-    updateTimerDisplay();
-    if(timerSeconds === 30 || timerSeconds === 10){ vibrate(20); speakText(`${timerSeconds} seconds left`); }
-    else if(timerSeconds === 3 || timerSeconds === 2 || timerSeconds === 1){ vibrate(20); speakText(`${timerSeconds}`); }
-    if(timerSeconds <= 0){
-      clearInterval(timerInterval);
-      vibrate([100,50,100]);
-      speakText("Time's up", { interrupt:true, onend: () => { if(idx < steps.length - 1) transitionTo(idx + 1); } });
-    }
-  }, 1000);
+  timerTotal = seconds;
+  timerRunning = true;
+  timerCompleted = false;
+  lastAnnouncedSecond = null;
+  timerEndAt = Date.now() + seconds*1000;
+  clearInterval(timerInterval);
+  tickTimer();
+  timerInterval = setInterval(tickTimer, 250);
 }
+function tickTimer(){
+  if(!timerRunning || timerCompleted) return;
+  const remaining = Math.max(0, Math.round((timerEndAt - Date.now())/1000));
+  timerSeconds = remaining;
+  updateTimerDisplay();
+
+  if(remaining !== lastAnnouncedSecond){
+    if(remaining === 30 || remaining === 10){ vibrate(20); speakText(`${remaining} seconds left`); }
+    else if(remaining === 3 || remaining === 2 || remaining === 1){ vibrate(20); speakText(`${remaining}`); }
+    lastAnnouncedSecond = remaining;
+  }
+
+  if(remaining <= 0 && !timerCompleted){
+    timerCompleted = true;
+    clearInterval(timerInterval);
+    vibrate([100,50,100]);
+    speakText("Time's up", { interrupt:true, onend: () => { if(idx < steps.length - 1) transitionTo(idx + 1); } });
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden && timerRunning) tickTimer();
+});
 function updateTimerDisplay(){
   const m = Math.floor(Math.max(timerSeconds,0)/60), s = Math.max(timerSeconds,0)%60;
   document.getElementById('timerDisplay').innerText = `${m}:${s.toString().padStart(2,'0')}`;
 }
-function toggleTimer(){ vibrate(10); timerRunning = !timerRunning; document.getElementById('timerToggleBtn').innerText = timerRunning ? 'Pause' : 'Resume'; }
-function resetTimer(){ vibrate(10); clearInterval(timerInterval); startTimer(timerTotal); }
+function toggleTimer(){
+  vibrate(10);
+  if(timerRunning){
+    timerRemainingAtPause = Math.max(0, Math.round((timerEndAt - Date.now())/1000));
+    timerRunning = false;
+  } else {
+    timerEndAt = Date.now() + timerRemainingAtPause*1000;
+    timerRunning = true;
+  }
+  document.getElementById('timerToggleBtn').innerText = timerRunning ? 'Pause' : 'Resume';
+}
+function resetTimer(){ vibrate(10); startTimer(timerTotal); document.getElementById('timerToggleBtn').innerText = 'Pause'; }
 
 let timerWasRunningBeforeEdit = false;
 function showTimerEdit(){
@@ -697,12 +744,17 @@ function showTimerEdit(){
 function applyTimerEdit(){
   const m = parseInt(document.getElementById('editMin').value) || 0;
   const s = parseInt(document.getElementById('editSec').value) || 0;
-  timerSeconds = m*60 + s;
-  timerTotal = timerSeconds;
+  const secs = m*60 + s;
+  timerTotal = secs;
+  timerSeconds = secs;
+  timerRemainingAtPause = secs;
+  timerCompleted = false;
+  lastAnnouncedSecond = null;
   updateTimerDisplay();
   document.getElementById('timerEditBox').style.display = 'none';
   document.getElementById('timerDisplayWrap').style.display = 'block';
   timerRunning = timerWasRunningBeforeEdit;
+  if(timerRunning) timerEndAt = Date.now() + secs*1000;
   document.getElementById('timerToggleBtn').innerText = timerRunning ? 'Pause' : 'Resume';
 }
 function nextStep(){
