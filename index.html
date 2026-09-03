@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Roxlog">
+<meta name="apple-mobile-web-app-title" content="Ty K's Advanced Hyrox App">
 <meta name="theme-color" content="#15171C" id="metaTheme">
-<meta name="description" content="Roxlog: a Hyrox and running training companion. Guided workouts, set logging, race simulations, and progress tracking.">
-<title>Roxlog</title>
+<meta name="description" content="Ty K's Advanced Hyrox App: a Hyrox and running training companion. Guided workouts, set logging, race simulations, and progress tracking.">
+<title>Ty K's Advanced Hyrox App</title>
 <style>
 /* ============================================================
    TOKENS
@@ -400,7 +400,7 @@ html[data-theme="light"] .tab.on svg{color:#B58F00}
 <section class="screen active" id="screenHome" data-tab="home">
   <div class="wrap pt-safe">
     <div class="flex between">
-      <div class="brandmark"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#15171C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l4-10 4 7 4-10 4 13"/></svg></span>Roxlog</div>
+      <div class="brandmark"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#15171C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l4-10 4 7 4-10 4 13"/></svg></span>Ty K's Advanced Hyrox App</div>
       <button class="btn-icon" data-action="go" data-to="screenSettings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     </div>
     <div class="home-head">
@@ -2057,9 +2057,9 @@ RENDERERS.screenSettings = () => {
   $('stDataSummary').textContent = `${DB.workouts.length} workouts, ${sets} logged sets, ${DB.sims.length} sims, ${DB.races.length} races, ${DB.templates.length} templates. About ${Math.round((localStorage.getItem(DB_KEY)||'').length/1024)} KB on this device.`;
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  $('installHint').textContent = standalone ? 'Installed. Roxlog is running from your home screen.' : ios ? 'In Safari, tap Share, then Add to Home Screen. It opens full screen with no browser chrome.' : 'Install Roxlog for a full-screen app with its own icon.';
+  $('installHint').textContent = standalone ? "Installed. Ty K's Advanced Hyrox App is running from your home screen." : ios ? 'In Safari, tap Share, then Add to Home Screen. It opens full screen with no browser chrome.' : "Install Ty K's Advanced Hyrox App for a full-screen app with its own icon.";
   $('installBtn').classList.toggle('hidden', !PWA.prompt);
-  $('versionLine').textContent = `Roxlog ${APP_VERSION}`;
+  $('versionLine').textContent = `Ty K's Advanced Hyrox App ${APP_VERSION}`;
 };
 AC.stName = el => { S().name = el.value.trim() || 'athlete'; saveDB(); };
 A.stTheme = el => { S().theme = el.dataset.v; saveDB(); setSeg('stTheme', S().theme); applyTheme(); };
@@ -2108,7 +2108,7 @@ const PWA = { prompt:null };
   const svgUrl = 'data:image/svg+xml,' + encodeURIComponent(icon);
   const addManifest = (pngUrl) => {
     const icons = pngUrl ? [{ src: pngUrl, sizes:'512x512', type:'image/png', purpose:'any maskable' }] : [{ src: svgUrl, sizes:'512x512', type:'image/svg+xml', purpose:'any' }];
-    const manifest = { name:'Roxlog', short_name:'Roxlog', start_url: location.pathname, scope: location.pathname.replace(/[^/]*$/, ''), display:'standalone', orientation:'portrait', background_color:'#15171C', theme_color:'#15171C', icons };
+    const manifest = { name:"Ty K's Advanced Hyrox App", short_name:'Hyrox App', start_url: location.pathname, scope: location.pathname.replace(/[^/]*$/, ''), display:'standalone', orientation:'portrait', background_color:'#15171C', theme_color:'#15171C', icons };
     const link = document.createElement('link'); link.rel = 'manifest'; link.href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(manifest)); document.head.appendChild(link);
     const touch = document.createElement('link'); touch.rel = 'apple-touch-icon'; touch.sizes = '180x180'; touch.href = pngUrl || svgUrl; document.head.appendChild(touch);
   };
