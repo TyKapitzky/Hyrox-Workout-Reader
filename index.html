@@ -161,6 +161,10 @@ html[data-theme="light"] .seg button.on{box-shadow:0 1px 3px rgba(20,22,26,.10)}
 .rowitem .chev{color:var(--text3);flex-shrink:0}
 .rowitem .chev svg{width:16px;height:16px}
 .rowitem.tap:active{opacity:.7}
+.rowitem[data-action="openWorkout"]{will-change:transform;background:var(--bg);position:relative}
+.block .drag{touch-action:none;color:var(--text3);padding:8px 6px;margin:-8px -2px -8px -6px;cursor:grab;flex-shrink:0;display:flex;align-items:center}
+.block .drag svg{width:18px;height:18px}
+.block.dragging{opacity:.75;transform:scale(1.02);box-shadow:0 12px 30px rgba(0,0,0,.35);z-index:2;position:relative}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:var(--neutral-soft);color:var(--text2)}
 .pill.run{background:var(--run-soft);color:var(--run)} .pill.strength,.pill.station,.pill.set{background:var(--station-soft);color:var(--station)} .pill.rest{background:var(--rest-soft);color:var(--rest)} .pill.detail{background:var(--detail-soft);color:var(--detail)} .pill.brand{background:var(--brand-soft);color:var(--brand)} .pill.danger{background:var(--danger-soft);color:var(--danger)}
 html[data-theme="light"] .pill.brand{color:#7A5B00}
@@ -173,6 +177,9 @@ html[data-theme="light"] .pill.brand{color:#7A5B00}
    ============================================================ */
 .home-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:8px 0 18px}
 .home-head .date{font-size:13px;color:var(--text2);font-weight:600;margin-bottom:6px}
+.home-head .quote{font-style:italic;font-weight:600;color:var(--text2);margin-top:8px;white-space:nowrap;font-size:clamp(12px,3.75vw,17px);letter-spacing:-.01em}
+.weekstrip .d{cursor:pointer}
+.weekstrip .d.has:active{transform:scale(.95)}
 .brandmark{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:-.02em;font-size:15px}
 .brandmark .mark{width:26px;height:26px;border-radius:8px;background:var(--brand);display:flex;align-items:center;justify-content:center}
 .brandmark .mark svg{width:16px;height:16px}
@@ -218,11 +225,11 @@ html[data-theme="light"] .weekstrip .d.today .dn{color:#7A5B00}
    PLAYER
    ============================================================ */
 .lane{display:flex;gap:3px;height:8px;margin:2px 0 14px}
-.lane span{flex:1;border-radius:4px;background:var(--line);position:relative;overflow:hidden}
+.lane span{flex:1;border-radius:4px;background:var(--line);position:relative;cursor:pointer}
+.lane span::before{content:'';position:absolute;left:-1px;right:-1px;top:-14px;bottom:-14px}
 .lane span.done{background:var(--text3)}
-.lane span.cur{background:var(--seg)}
-.lane span.cur::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);animation:sheen 1.4s infinite}
-@keyframes sheen{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.lane span.cur{background-color:var(--seg);background-image:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.4) 50%,transparent 100%);background-size:200% 100%;background-repeat:no-repeat;animation:sheen 1.4s linear infinite}
+@keyframes sheen{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .lane span.run{--seg:var(--run)} .lane span.exercise,.lane span.set{--seg:var(--station)} .lane span.rest{--seg:var(--rest)} .lane span.detail{--seg:var(--detail)} .lane span.section{--seg:var(--neutral)}
 .pcard{flex:1;min-height:340px;background:var(--surface);border:1px solid var(--line);border-radius:26px;padding:26px 20px 22px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:opacity .18s ease,transform .18s ease}
 .pcard.fade{opacity:0;transform:translateY(6px) scale(.985)}
@@ -404,7 +411,7 @@ html[data-theme="light"] .tab.on svg{color:#B58F00}
       <button class="btn-icon" data-action="go" data-to="screenSettings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     </div>
     <div class="home-head">
-      <div><div class="date" id="homeDate"></div><div class="display" id="homeGreeting">Ready, Ty.</div></div>
+      <div style="min-width:0"><div class="date" id="homeDate"></div><div class="display" id="homeGreeting">Ready, Ty.</div><div class="quote">To build a new body your old one has to die.</div></div>
     </div>
     <div class="card flat">
       <div class="flex between"><span class="h3">This week</span><span class="meta-sm" id="weekRange"></span></div>
@@ -1176,6 +1183,38 @@ function workoutRow(w){
     <div class="chev">${ICON_CHEV}</div>
   </div>`;
 }
+function deleteWorkoutById(id){
+  DB.workouts = DB.workouts.filter(w => w.id !== id); saveDB(); toast('Workout deleted');
+  if(RENDERERS[currentScreen]) RENDERERS[currentScreen]();
+}
+/* swipe a workout row to the left to get the delete option */
+(function(){
+  let row = null, sx = 0, sy = 0, dx = 0, moved = false;
+  document.addEventListener('touchstart', e => {
+    const r = e.target.closest('.rowitem[data-action="openWorkout"]');
+    if(!r || e.touches.length !== 1){ row = null; return; }
+    row = r; const t = e.touches[0]; sx = t.clientX; sy = t.clientY; dx = 0; moved = false;
+  }, { passive:true });
+  document.addEventListener('touchmove', e => {
+    if(!row) return; const t = e.touches[0]; const ddx = t.clientX - sx, ddy = t.clientY - sy;
+    if(!moved && Math.abs(ddy) > Math.abs(ddx)){ row = null; return; }
+    if(ddx < 0){ moved = true; dx = Math.max(ddx, -110); row.style.transition = 'none'; row.style.transform = `translateX(${dx}px)`; }
+  }, { passive:true });
+  const finish = () => {
+    if(!row) return; const r = row; row = null;
+    r.style.transition = 'transform .18s ease'; r.style.transform = '';
+    if(moved && dx < -70){
+      const id = r.dataset.id; const w = getWorkout(id); if(!w) return;
+      haptic(15);
+      sheet({ title: w.title, msg: `${w.type}, ${fmtDate(w.date, {weekday:'short', month:'short', day:'numeric'})}`, actions:[
+        { label:'Delete workout', cls:'btn-danger', fn: () => deleteWorkoutById(id) },
+        { label:'Edit workout', cls:'btn-ghost', fn: () => openEditor(id) }
+      ]});
+    }
+  };
+  document.addEventListener('touchend', finish); document.addEventListener('touchcancel', finish);
+})();
+
 function weekBuckets(nWeeks){
   const thisMon = mondayOf(today());
   const weeks = [];
@@ -1213,7 +1252,7 @@ RENDERERS.screenHome = () => {
     if(DB.sims.some(s => s.date === d)) types.add('hyrox');
     if(DB.races.some(r => r.date === d)) types.add('run');
     const cls = types.size > 1 ? 'multi' : (types.size ? [...types][0] : '');
-    return `<div class="d ${d === t ? 'today' : ''}"><span class="dn">${n}</span><span class="dot ${cls}"></span></div>`;
+    return `<div class="d ${d === t ? 'today' : ''} ${types.size ? 'has' : ''}" data-action="dayPeek" data-d="${d}"><span class="dn">${n}</span><span class="dot ${cls}"></span></div>`;
   }).join('');
   const wk = weekBuckets(1)[0];
   $('weekStats').innerHTML = `<div class="stat"><div class="v">${wk.sessions}</div><div class="k">sessions</div></div><div class="stat"><div class="v">${Math.round(wk.minutes)}</div><div class="k">minutes</div></div><div class="stat"><div class="v">${distDisplay(wk.miles).toFixed(1)}</div><div class="k">${S().dist === 'km' ? 'km' : 'miles'}</div></div>`;
@@ -1373,8 +1412,18 @@ function stepColor(step){ const c = stepClass(step); return c === 'run' ? 'var(-
 function clearTos(){ P.tos.forEach(clearTimeout); P.tos = []; }
 function stopAll(){ Speech.stop(); clearInterval(T.int); T.running = false; clearTos(); P.transitioning = false; }
 
+A.dayPeek = el => {
+  const d = el.dataset.d;
+  const ws = DB.workouts.filter(w => w.date === d);
+  const sims = DB.sims.filter(s => s.date === d);
+  if(!ws.length && !sims.length){ toast(`Nothing logged on ${fmtDate(d, {weekday:'short', month:'short', day:'numeric'})}`); return; }
+  if(ws.length === 1 && !sims.length){ openWorkout(ws[0].id); return; }
+  const html = `<div class="list">${ws.map(workoutRow).join('')}${sims.map(s => `<div class="rowitem tap" data-action="simDetail" data-id="${s.id}"><div class="rail hyrox"></div><div class="grow"><div class="ttl">${SIM_SIZES[s.size].label} Hyrox sim</div><div class="sub">${DIVISIONS[s.division].label}</div></div><div class="right num h2">${fmtClock(s.total)}</div><div class="chev">${ICON_CHEV}</div></div>`).join('')}</div>`;
+  sheet({ title: fmtDate(d, {weekday:'long', month:'long', day:'numeric'}), html, cancel:'Close' });
+};
 A.openWorkout = el => openWorkout(el.dataset.id);
 function openWorkout(id){
+  closeSheet();
   const w = getWorkout(id); if(!w) return;
   const steps = parseWorkout(w.raw);
   if(!steps.length){ toast('This workout has no valid tagged lines'); openEditor(id); return; }
@@ -1397,12 +1446,62 @@ RENDERERS.screenBlocks = () => {
     const sets = sec.steps.filter(s => s.type === 'SET').length;
     const secs = sec.steps.reduce((a, s) => a + (s.seconds||0), 0);
     const meta = [`${n} step${n===1?'':'s'}`, sets ? `${sets} sets` : null, secs ? `${Math.round(secs/60)} min timed` : null].filter(Boolean).join(', ');
-    return `<div class="block ${isDone?'done':''}" data-action="openSection" data-i="${i}"><div class="n">${isDone ? '✓' : i+1}</div><div class="grow"><div class="t">${escapeHtml(sec.title || `Block ${i+1}`)}</div><div class="m">${meta}${isDone ? ', completed' : ''}</div></div><div class="chev">${ICON_CHEV}</div></div>`;
+    return `<div class="block ${isDone?'done':''}" data-action="openSection" data-i="${i}"><span class="drag" data-action="noop" aria-label="Drag to reorder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span><div class="n">${isDone ? '✓' : i+1}</div><div class="grow"><div class="t">${escapeHtml(sec.title || `Block ${i+1}`)}</div><div class="m">${meta}${isDone ? ', completed' : ''}</div></div><div class="chev">${ICON_CHEV}</div></div>`;
   }).join('');
   $('blocksNotes').innerHTML = w.notes ? `<div class="h3 mb8">Notes</div><div class="meta" style="white-space:pre-wrap">${escapeHtml(w.notes)}</div>` : '';
   $('blocksNotes').classList.toggle('hidden', !w.notes);
 };
+A.noop = () => {};
 A.openSection = el => openSection(Number(el.dataset.i));
+
+/* Split raw text into one chunk per block so blocks can be reordered without touching their contents */
+function rawSectionChunks(raw){
+  const lines = String(raw||'').split('\n'); const chunks = []; let cur = [];
+  lines.forEach(line => {
+    if(/^\s*SECTION:/i.test(line) && cur.length){ chunks.push(cur); cur = []; }
+    cur.push(line);
+  });
+  if(cur.length) chunks.push(cur);
+  /* drop chunks that produce no steps (e.g. stray blank lines before the first block) */
+  return chunks.map(c => c.join('\n')).filter(c => parseWorkout(c).length);
+}
+function applyBlockOrder(order){
+  const w = getWorkout(P.workoutId); if(!w) return;
+  if(order.every((v, i) => v === i)) return;
+  const chunks = rawSectionChunks(w.raw);
+  if(chunks.length !== P.sections.length || order.length !== chunks.length){ toast('Could not reorder this workout safely'); RENDERERS.screenBlocks(); return; }
+  w.raw = order.map(i => chunks[i].trim()).join('\n\n');
+  const pos = oldIdx => order.indexOf(oldIdx);
+  w.completedSections = (w.completedSections || []).map(pos).filter(i => i >= 0);
+  const logs = {}; Object.entries(w.logs || {}).forEach(([k, v]) => { const [si, sti] = k.split(':').map(Number); logs[`${pos(si)}:${sti}`] = v; }); w.logs = logs;
+  saveDB();
+  P.sections = annotateExercises(groupIntoSections(parseWorkout(w.raw)));
+  RENDERERS.screenBlocks(); haptic(15); toast('Blocks reordered');
+}
+(function(){
+  let dragEl = null, list = null;
+  document.addEventListener('pointerdown', e => {
+    const h = e.target.closest('.block .drag'); if(!h) return;
+    dragEl = h.closest('.block'); list = $('blockList'); if(!dragEl || !list) { dragEl = null; return; }
+    e.preventDefault(); dragEl.classList.add('dragging');
+    try{ h.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  document.addEventListener('pointermove', e => {
+    if(!dragEl) return; e.preventDefault();
+    const siblings = [...list.querySelectorAll('.block:not(.dragging)')];
+    const after = siblings.find(s => { const r = s.getBoundingClientRect(); return e.clientY < r.top + r.height/2; });
+    if(after){ if(after !== dragEl.nextElementSibling) list.insertBefore(dragEl, after); }
+    else if(list.lastElementChild !== dragEl) list.appendChild(dragEl);
+  });
+  const end = () => {
+    if(!dragEl) return;
+    dragEl.classList.remove('dragging');
+    const order = [...list.querySelectorAll('.block')].map(b => Number(b.dataset.i));
+    dragEl = null;
+    applyBlockOrder(order);
+  };
+  document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+})();
 A.playAll = () => { P.playAll = true; const w = getWorkout(P.workoutId); const first = P.sections.findIndex((s,i) => !(w.completedSections||[]).includes(i)); openSection(first < 0 ? 0 : first); };
 A.resetProgress = () => confirmSheet('Reset progress?', 'Clears completed blocks and logged sets for this session so you can run it again.', 'Reset', () => { const w = getWorkout(P.workoutId); w.completedSections = []; w.logs = {}; w.completedAt = null; w.duration = null; saveDB(); RENDERERS.screenBlocks(); toast('Progress reset'); });
 A.goBlocks = () => { stopAll(); if(P.sections.length <= 1){ goTab('screenHome'); } else { go('screenBlocks', { replace:true }); } };
@@ -1431,7 +1530,7 @@ function saveCurrentLog(markDone){
   saveDB();
 }
 function renderLane(){
-  $('lane').innerHTML = P.steps.map((s, i) => `<span class="${stepClass(s)} ${i < P.idx ? 'done' : i === P.idx ? 'cur' : ''}"></span>`).join('');
+  $('lane').innerHTML = P.steps.map((s, i) => `<span class="${stepClass(s)} ${i < P.idx ? 'done' : i === P.idx ? 'cur' : ''}" data-action="laneJump" data-i="${i}" aria-label="Go to step ${i+1}"></span>`).join('');
 }
 function renderStep(){
   clearInterval(T.int); T.running = false; T.done = false;
@@ -1504,18 +1603,24 @@ function showGetReady(newIdx, cd){
   const card = $('pcard'); const up = P.steps[newIdx];
   card.style.setProperty('--tcolor', 'var(--neutral)');
   $('playerStep').textContent = `${newIdx+1} / ${P.steps.length}`;
-  $('pType').className = 'pill'; $('pType').textContent = 'Get ready';
+  $('pType').className = 'pill'; $('pType').textContent = 'Coming up';
   $('pDiagram').innerHTML = ''; $('pBadge').textContent = ''; $('setlog').classList.add('hidden'); $('setref').classList.add('hidden'); $('timerBox').classList.add('hidden');
-  $('pText').className = 'steptext ready'; $('pText').innerHTML = `Coming up<b>${escapeHtml(up.raw)}</b>`;
-  const ann = `Get ready. Coming up: ${up.spoken.split('.')[0]}`;
-  haptic(20); Speech.say(ann, { interrupt:true });
-  const est = clamp(ann.split(/\s+/).length * 330, 1200, 6000);
-  P.tos.push(setTimeout(() => runCountdown(newIdx, cd), est));
+  $('pText').className = 'steptext ready'; $('pText').innerHTML = `<b>${escapeHtml(up.raw)}</b>`;
+  const ann = `Coming up: ${up.spoken.split('.')[0]}`;
+  haptic(20);
+  /* Start the countdown only after the announcement finishes. onend is unreliable on iOS,
+     so a generous word-count fallback also fires; whichever comes first wins, once. */
+  let started = false;
+  const begin = () => { if(started || !P.transitioning || P.pendingIdx !== newIdx) return; started = true; runCountdown(newIdx, cd); };
+  const rate = Number(S().rate) || 0.92;
+  const est = clamp(Math.round((ann.split(/\s+/).length * 420 + 700) / rate), 1500, 14000);
+  Speech.say(ann, { interrupt:true, onend: () => { P.tos.push(setTimeout(begin, 300)); } });
+  P.tos.push(setTimeout(begin, est));
 }
 function runCountdown(newIdx, n){
   if(n <= 0){ P.transitioning = false; P.idx = newIdx; renderStep(); return; }
   const up = P.steps[newIdx];
-  $('pText').innerHTML = `Coming up<b>${escapeHtml(up.raw)}</b><span class="count">${n}</span>`;
+  $('pText').innerHTML = `<b>${escapeHtml(up.raw)}</b><span class="count">${n}</span>`;
   haptic(15); Speech.say(String(n), { interrupt:true, rate:1.1 });
   P.tos.push(setTimeout(() => runCountdown(newIdx, n-1), 1000));
 }
@@ -1530,6 +1635,19 @@ A.playerList = () => {
   sheet({ title: P.sections[P.secIdx].title || 'Steps', html, cancel:'Close' });
 };
 A.jumpStep = el => { closeSheet(); const i = Number(el.dataset.i); if(i === P.idx) return; clearTos(); P.transitioning = false; saveCurrentLog(false); transitionTo(i, false); };
+A.laneJump = el => { const i = Number(el.dataset.i); if(i === P.idx) return; clearTos(); P.transitioning = false; saveCurrentLog(false); haptic(10); transitionTo(i, false); };
+
+/* swipe left = next, swipe right = previous, on the player card */
+(function(){
+  const card = $('pcard'); let sx = 0, sy = 0, t0 = 0, active = false;
+  card.addEventListener('touchstart', e => { if(e.touches.length !== 1) return; const t = e.touches[0]; sx = t.clientX; sy = t.clientY; t0 = Date.now(); active = true; }, { passive:true });
+  card.addEventListener('touchend', e => {
+    if(!active) return; active = false;
+    if(e.target.closest('input,button,[data-action]')) return;
+    const t = e.changedTouches[0]; const dx = t.clientX - sx, dy = t.clientY - sy;
+    if(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 800){ if(dx < 0) A.nextStep(); else A.prevStep(); }
+  }, { passive:true });
+})();
 
 /* timer */
 function startTimer(sec){
@@ -2104,7 +2222,14 @@ A.resetAll = () => confirmSheet('Delete all data?', 'Every workout, logged set, 
    ============================================================ */
 const PWA = { prompt:null };
 (function installManifest(){
-  const icon = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='112' fill='#15171C'/><path d='M96 352l64-176 80 128 72-176 104 224' fill='none' stroke='#F5C518' stroke-width='44' stroke-linecap='round' stroke-linejoin='round'/></svg>`;
+  const icon = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>
+    <defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#1B1E24'/><stop offset='1' stop-color='#0B0C10'/></linearGradient></defs>
+    <rect width='512' height='512' rx='112' fill='url(#g)'/>
+    <path d='M-40 372L552 156L552 236L-40 452Z' fill='#F5C518' opacity='0.16'/>
+    <path d='M-40 412L552 196L552 224L-40 480Z' fill='#F5C518' opacity='0.10'/>
+    <text x='256' y='318' text-anchor='middle' font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-weight='900' font-style='italic' font-size='236' fill='#F5C518' letter-spacing='-12'>TK</text>
+    <path d='M84 412l52-96 44 60 52-120 60 92 44-60 92 124' fill='none' stroke='#F2F3F5' stroke-width='22' stroke-linecap='round' stroke-linejoin='round'/>
+  </svg>`;
   const svgUrl = 'data:image/svg+xml,' + encodeURIComponent(icon);
   const addManifest = (pngUrl) => {
     const icons = pngUrl ? [{ src: pngUrl, sizes:'512x512', type:'image/png', purpose:'any maskable' }] : [{ src: svgUrl, sizes:'512x512', type:'image/svg+xml', purpose:'any' }];
@@ -2136,3 +2261,4 @@ go('screenHome', { replace:true });
 </script>
 </body>
 </html>
+
