@@ -475,7 +475,7 @@ html[data-theme="light"] .tab.on svg{color:#B58F00}
     </div>
     <input type="file" id="ocrInput" accept="image/*" multiple class="hidden">
     <div class="hint" id="ocrStatus"></div>
-    <textarea id="edRaw" placeholder="SECTION: Warm-up | Time to warm up
+    <textarea id="edRaw" data-action-input="stravaLive" placeholder="SECTION: Warm-up | Time to warm up
 EXERCISE: Assault bike | Steady pace | 5'
 SET: 5 reps / 185 lbs | Five reps at 185
 REST: 2' | Rest two minutes"></textarea>
@@ -485,6 +485,12 @@ REST: 2' | Rest two minutes"></textarea>
     <div class="grid2 mt20">
       <button class="btn btn-ghost" data-action="insertExample">Insert example</button>
       <button class="btn btn-ghost" data-action="saveAsTemplate">Save as template</button>
+    </div>
+    <label class="lbl">Strava description</label>
+    <div class="card flat" style="padding:14px">
+      <textarea id="stravaOut" readonly style="min-height:130px;font-family:var(--sans);font-size:14px;line-height:1.5"></textarea>
+      <button class="btn btn-ghost btn-block mt8" data-action="copyStrava" data-src="stravaOut">Copy</button>
+      <div class="hint">Auto-built from the session text above. Paste straight into a Strava activity.</div>
     </div>
     <div id="editDanger" class="mt12 hidden"><button class="btn btn-danger-soft btn-block" data-action="deleteWorkoutFromEdit">Delete workout</button></div>
   </div>
@@ -579,6 +585,9 @@ REST: 2' | Rest two minutes"></textarea>
       <div id="doneDistWrap"><label class="lbl">Distance <span id="doneDistUnit" class="faint">mi</span></label><input class="input mono" type="number" inputmode="decimal" step="0.01" id="doneDist" placeholder="0.0"></div>
       <label class="lbl">Duration (minutes)</label><input class="input mono" type="number" inputmode="numeric" id="doneDur" placeholder="0">
       <label class="lbl">Notes</label><textarea id="doneNotes" style="min-height:70px;font-family:var(--sans);font-size:15px" placeholder="Optional"></textarea>
+      <label class="lbl">Strava description</label>
+      <textarea id="stravaOutDone" readonly style="min-height:130px;font-family:var(--sans);font-size:14px;line-height:1.5"></textarea>
+      <button class="btn btn-ghost btn-block mt8" data-action="copyStrava" data-src="stravaOutDone">Copy</button>
       <button class="btn btn-primary btn-lg btn-block mt20" data-action="finishWorkout">Save session</button>
       <button class="btn btn-ghost btn-block mt8" data-action="finishWorkoutSkip">Skip and go home</button>
     </div>
@@ -1311,6 +1320,7 @@ function openEditor(id, preset){
   $('editDanger').classList.toggle('hidden', !w);
   setSeg('edType', ed.type);
   if(!ed.titleEdited) autoTitle();
+  renderStrava();
   go('screenEdit');
 }
 A.newWorkout = () => openEditor(null);
@@ -1319,8 +1329,9 @@ A.editCurrent = () => openEditor(P.workoutId);
 A.edType = el => { ed.type = el.dataset.v; setSeg('edType', ed.type); autoTitle(); };
 AI.titleEdited = () => { ed.titleEdited = true; };
 AI.autoTitle = () => autoTitle();
-A.insertExample = () => { $('edRaw').value = EXAMPLE_TEXT; if(!ed.titleEdited){ ed.type = 'Strength'; setSeg('edType','Strength'); autoTitle(); } };
-A.smartFormat = () => { const raw = $('edRaw').value.trim(); if(!raw){ toast('Paste or scan some text first'); return; } $('edRaw').value = smartFormat(raw); toast('Tagged. Check each line before saving.'); };
+AI.stravaLive = () => renderStrava();
+A.insertExample = () => { $('edRaw').value = EXAMPLE_TEXT; if(!ed.titleEdited){ ed.type = 'Strength'; setSeg('edType','Strength'); autoTitle(); } renderStrava(); };
+A.smartFormat = () => { const raw = $('edRaw').value.trim(); if(!raw){ toast('Paste or scan some text first'); return; } $('edRaw').value = smartFormat(raw); renderStrava(); toast('Tagged. Check each line before saving.'); };
 A.saveWorkout = () => {
   const title = $('edTitle').value.trim() || 'Workout';
   const date = $('edDate').value || today();
@@ -1347,6 +1358,239 @@ A.saveAsTemplate = () => {
 };
 A.deleteWorkoutFromEdit = () => { if(!ed.id) return; confirmSheet('Delete this workout?', 'Logged sets and progress for this session go with it.', 'Delete', () => { DB.workouts = DB.workouts.filter(w => w.id !== ed.id); saveDB(); toast('Deleted'); goTab('screenHome'); }, true); };
 
+/* Turn tagged session text into a short, readable Strava description.
+   Repeated rounds collapse into "3x ..." and spoken text is dropped. */
+/* ============================================================
+   STRAVA DESCRIPTION
+   Flat list of movements, each appearing once with its totals summed
+   across the whole session. Abbreviations apply here only; the cards
+   and the spoken text are untouched.
+   ============================================================ */
+const STRAVA_ABBR = [
+  /* equipment */
+  [/\bdual kettlebells?\b/gi, 'Double KB'], [/\bdual dumbbells?\b/gi, 'Double DB'],
+  [/\bdual db\b/gi, 'Double DB'], [/\bdual kb\b/gi, 'Double KB'],
+  [/\bkettlebells?\b/gi, 'KB'], [/\bdumbbells?\b/gi, 'DB'], [/\bbarbells?\b/gi, 'BB'],
+  [/\bmedicine ball\b/gi, 'MB'], [/\bassault bike\b/gi, 'AB'], [/\bski ?erg\b/gi, 'Ski'],
+  [/\bwall ?balls?\b/gi, 'WB'], [/\bsand ?bag\b/gi, 'SB'], [/\bjust (the )?BB\b/gi, 'empty bar'],
+  [/\bbody ?weight\b/gi, 'BW'],
+  /* movements */
+  [/\bburpee broad jumps?\b/gi, 'BBJ'], [/\bbulgarian split squats?\b/gi, 'BSS'],
+  [/\bromanian deadlifts?\b/gi, 'RDL'], [/\bconventional deadlifts?\b/gi, 'DL'], [/\bdeadlifts?\b/gi, 'DL'],
+  [/\bbench press\b/gi, 'Bench'], [/\bgood mornings?\b/gi, 'GM'], [/\bhip extensions?\b/gi, 'hip ext'],
+  [/\bexternal rotations?\b/gi, 'Ext Rotation'], [/\bscapular\b/gi, 'Scap'],
+  [/\bfront rack\b/gi, 'FR'], [/\bhand ?release\b/gi, 'HR'], [/\bfarmers?'? carr(y|ies)\b/gi, 'Farmers'],
+  [/\bpull ?ups?\b/gi, 'pull-ups'], [/\bpush ?ups?\b/gi, 'push-ups'], [/\bsit ?ups?\b/gi, 'sit-ups'],
+  [/\bsingle ?arm\b/gi, 'SA'], [/\bbackwards?\b/gi, 'back'],
+  /* effort and prescription */
+  [/\bas fast as possible\b/gi, 'AFAP'], [/\bas long as possible\b/gi, 'ALAP'],
+  [/\breps? in reserve\b/gi, 'RIR'], [/\brate of perceived exertion\b/gi, 'RPE'],
+  [/\bmax(imum|imal)?( effort)?\b/gi, 'max'], [/\bzone (\d)\b/gi, 'Z$1'],
+  [/\beccentric\b/gi, 'ecc'], [/\bpro race pace\b/gi, 'pro race'], [/\brace pace\b/gi, 'race'],
+  [/\bat race weight plus\b/gi, '@ race+'], [/\bof (your )?(pro race|race)\b/gi, '$2'],
+  /* units */
+  [/\bkilometers?\b/gi, 'km'], [/\bmeters?\b/gi, 'm'], [/\bkilos?\b/gi, 'kg'], [/\bpounds?\b/gi, 'lb'],
+  [/\bk?calories?\b/gi, 'cal'], [/\bkcal\b/gi, 'cal'],
+  [/\bminutes?\b/gi, 'min'], [/\bseconds?\b/gi, 's'], [/\bpercent\b/gi, '%'],
+  /* connectives */
+  [/\beach side\b/gi, 'ea'], [/\beach leg\b/gi, 'ea leg'], [/\beach\b/gi, 'ea'],
+  [/\bwith\b/gi, 'w/'], [/\bbetween\b/gi, 'btw'], [/\bapprox(imately)?\b/gi, '~'], [/\baround\b/gi, '~'],
+  /* tidy */
+  [/\s+at\s+(?=[\d~])/gi, ' @ '], [/\s+at\s+(?=pro race|race\b)/gi, ' @ '],
+  [/@ race\+\s+/gi, '@ race+'], [/(\d)\s+ea\b/g, '$1ea'], [/\bplus\b/gi, '+'],
+  [/\s*,\s*,+/g, ','], [/\s+,/g, ','], [/,\s*$/g, ''], [/\(\s*\)/g, ''], [/\s{2,}/g, ' ']
+];
+function abbrev(t){
+  let s = String(t || '');
+  STRAVA_ABBR.forEach(([re, to]) => { s = s.replace(re, to); });
+  return s.replace(/\s{2,}/g, ' ').trim();
+}
+function shortDur(sec){
+  if(!sec) return '';
+  if(sec % 60 === 0) return `${sec/60}min`;
+  if(sec < 180) return `${sec}s`;
+  return `${Math.floor(sec/60)}:${pad2(sec%60)}`;
+}
+/* Movement name: strip counters, leading quantities, and trailing detail clauses */
+const LEAD_QTY = /^\s*[\d./]+\s*(x\s*[\d./]+)?\s*(reps?|calories?|kcal|cal|m|km|mi|s|sec|min)?\s+/i;
+const NAME_STOPWORDS = /^(at|of|for time|for|w\/|and|the|to|max|afap|alap|amrap|emom|reps?|sets?|m|km|mi|cal|s|min|sec|ea)$/i;
+function movementName(text){
+  let t = String(text||'')
+    .replace(/^\s*(round|set|interval|minute|rep)\s*\d+\s*(of\s*\d+)?\s*[,:\-–]?\s*/i, '')
+    .replace(/^\s*(activation|feeder|hard)\s+set\s*\d*\s*[,:\-–]?\s*/i, '');
+  /* "For Time, Sled Pull" -> the movement is the second chunk */
+  let chunks = t.split(/\s*[,(]\s*/).filter(Boolean);
+  if(chunks.length > 1 && /^(for time|afap|alap|amrap|emom|max)$/i.test(chunks[0].trim())) chunks = chunks.slice(1);
+  t = chunks[0] || t;
+  t = t.replace(/\s*@.*$/, '');                                   /* drop "@ 62-65%", "@ 2K pace" */
+  let prev;
+  do { prev = t; t = t.replace(LEAD_QTY, ''); } while(t !== prev); /* "22/16 cal Ski" -> "Ski" */
+  t = t.replace(/\s+\d+[\d\-–/.]*\s*(reps?|m|km|cal|kg|lb|%|ea)?\s*$/i, '').trim();
+  if(NAME_STOPWORDS.test(t)) return '';
+  if(!/[a-z]{3}/i.test(t)) return '';
+  return t;
+}
+function nameKey(n){ return String(n).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
+/* Does this movement take an external load, so a % means % of 1RM? */
+function isLoadedLift(name){
+  return /\b(bb|db|kb|bench|press|squat|dl|deadlift|clean|snatch|lunge|curl|thruster|gm)\b/i.test(name)
+      && !/\b(ski|sled|run|bike|erg|jump|burpee|carry|drag|plate|wb)\b/i.test(name);
+}
+/* Pull the numeric detail out of a step */
+function stepDetail(step){
+  const t = abbrev(String(step.raw||''));
+  const out = {};
+  const pct = t.match(/(\d+(?:\.\d+)?)\s*(?:-\s*(\d+(?:\.\d+)?))?\s*%/);
+  if(pct){
+    out.pctLo = parseFloat(pct[1]); out.pctHi = parseFloat(pct[2] || pct[1]);
+    const tail = t.match(/%\s*(?:of\s*)?(pro race|race|effort)/i);
+    out.pctTail = tail ? tail[1].toLowerCase() : null;
+  }
+  const ea = t.match(/(\d+(?:\.\d+)?)\s*ea\b/i);
+  if(ea){ out.repLo = out.repHi = parseFloat(ea[1]); out.ea = true; }
+  else {
+    const reps = t.match(/(\d+(?:\.\d+)?)\s*(?:-\s*(\d+(?:\.\d+)?))?\s*reps?\b/i);
+    if(reps){ out.repLo = parseFloat(reps[1]); out.repHi = parseFloat(reps[2] || reps[1]); }
+  }
+  const dist = t.match(/(\d+(?:\.\d+)?)\s*(m|km)\b/i);
+  if(dist){ out.dist = parseFloat(dist[1]); out.distUnit = dist[2].toLowerCase(); }
+  const rel = t.match(/@\s*race\+\s*(\d+(?:\.\d+)?\s*(?:kg|lb))/i);
+  if(rel) out.note = `@ race+${rel[1].replace(/\s+/g,'')}`;
+  else {
+    const wt = t.match(/(\d+(?:\.\d+)?)\s*(?:-\s*(\d+(?:\.\d+)?))?\s*(lb|kg)\b/i);
+    if(wt){ out.wtLo = parseFloat(wt[1]); out.wtHi = parseFloat(wt[2] || wt[1]); out.wtUnit = wt[3].toLowerCase(); }
+  }
+  const cal = t.match(/(\d+(?:\.\d+)?)(?:\/\d+(?:\.\d+)?)?\s*cal\b/i);
+  if(cal) out.cal = parseFloat(cal[1]);
+  const pace = t.match(/@\s*([\d:]+\s*k?\s*pace|[\d:]+\s*\/\s*(?:km|mi)|(?:pro )?race\b(?!\+))/i);
+  if(pace && !out.note) out.pace = pace[1].trim();
+  if(/\bfor time\b/i.test(t)) out.forTime = true;
+  out.seconds = step.seconds || 0;
+  return out;
+}
+function rng(lo, hi){ return lo === hi ? String(lo) : `${lo}-${hi}`; }
+/* Merge every step of the session into one entry per movement */
+function movementTotals(raw){
+  const secs = groupIntoSections(parseWorkout(String(raw||'')));
+  const order = []; const map = {};
+  secs.forEach(sec => {
+    /* fallback name for steps that are only a prescription, e.g. "Set 1 of 4, 3 reps at 62-65%" */
+    const parts = String(sec.title||'').split(/\s*,\s*/);
+    const secName = abbrev((parts.length > 1 ? parts.slice(1).join(', ') : parts[0]) || '');
+    sec.steps.forEach(s => {
+      if(s.type === 'SECTION' || s.type === 'REST' || s.type === 'DETAIL') return;
+      let name = movementName(abbrev(s.raw)) || secName;
+      if(!name) return;
+      if(/\b(down|complete|completed)\s*[.!]?$/i.test(name) && name.length < 45) return;
+      const k = nameKey(name);
+      if(!k) return;
+      const d = stepDetail(s);
+      let e = map[k];
+      if(!e){ e = map[k] = { name, sets:0, reps:0, repLo:null, repHi:null, dist:0, distUnit:null, distCount:0, distEach:null,
+                             pctLo:null, pctHi:null, pctTail:null, wtLo:null, wtHi:null, wtUnit:null,
+                             cal:0, seconds:0, ea:false, forTime:false, pace:null }; order.push(k); }
+      e.sets++;
+      if(d.repLo != null){ e.reps += d.repHi; e.repLo = e.repLo == null ? d.repLo : Math.min(e.repLo, d.repLo); e.repHi = e.repHi == null ? d.repHi : Math.max(e.repHi, d.repHi); }
+      if(d.dist != null && d.distUnit && (!e.distUnit || e.distUnit === d.distUnit)){
+        e.distUnit = d.distUnit; e.dist += d.dist; e.distCount++;
+        if(e.distEach == null) e.distEach = d.dist; else if(e.distEach !== d.dist) e.distMixed = true;
+      }
+      if(d.pctLo != null){ e.pctLo = e.pctLo == null ? d.pctLo : Math.min(e.pctLo, d.pctLo); e.pctHi = e.pctHi == null ? d.pctHi : Math.max(e.pctHi, d.pctHi); if(d.pctTail) e.pctTail = d.pctTail; }
+      if(d.wtLo != null){ e.wtLo = e.wtLo == null ? d.wtLo : Math.min(e.wtLo, d.wtLo); e.wtHi = e.wtHi == null ? d.wtHi : Math.max(e.wtHi, d.wtHi); e.wtUnit = d.wtUnit; }
+      if(d.cal) e.cal += d.cal;
+      if(d.seconds) e.seconds += d.seconds;
+      if(d.ea) e.ea = true;
+      if(d.forTime) e.forTime = true;
+      if(d.pace && !e.pace) e.pace = d.pace;
+      if(d.note && !e.note) e.note = d.note;
+    });
+  });
+  return order.map(k => map[k]);
+}
+function movementLine(e){
+  const bits = [];
+  if(e.distCount){
+    if(e.distCount > 1 && !e.distMixed) bits.push(`${e.distCount}x${e.distEach}${e.distUnit}`);
+    else bits.push(`${Math.round(e.dist*100)/100}${e.distUnit}`);
+    if(e.cal) bits.push(`+ ${e.cal} cal`);
+  } else if(e.cal){
+    bits.push(`${e.cal} cal`);
+  } else if(e.repLo != null){
+    if(e.sets > 1 && e.repLo !== e.repHi) bits.push(`${e.sets} sets, ${rng(e.repLo, e.repHi)} reps`);
+    else if(e.ea) bits.push(`${e.reps}ea`);
+    else if(e.sets > 1) bits.push(`${e.sets}x${e.repHi}`);
+    else bits.push(`${e.repHi} reps`);
+  } else if(e.seconds){
+    bits.push(e.sets > 1 ? `${e.sets}x${shortDur(Math.round(e.seconds/e.sets))}` : shortDur(e.seconds));
+  } else if(e.sets > 1){
+    bits.push(`${e.sets} sets`);
+  }
+  if(e.wtLo != null) bits.push(`@ ${rng(e.wtLo, e.wtHi)}${e.wtUnit}`);
+  else if(e.pctLo != null){
+    const tail = e.pctTail ? ` ${e.pctTail}` : (isLoadedLift(e.name) ? ' of 1RM' : '');
+    bits.push(`@ ${rng(e.pctLo, e.pctHi)}%${tail}`);
+  } else if(e.pace){ bits.push(`@ ${e.pace}`); }
+  if(e.note) bits.push(e.note);
+  if(e.forTime) bits.push('for time');
+  return `${e.name} ${bits.join(' ')}`.replace(/\s{2,}/g,' ').trim();
+}
+/* Title: the biggest lifts plus the conditioning modality, Oxford comma */
+function titleWord(name){
+  let w = String(name)
+    .replace(/^(heavy|seated|max|double|reverse|box|dual)\s+/i, '')
+    .replace(/\b(bb|db|kb)\s+/i, '')
+    .trim();
+  const parts = w.split(/\s+/);
+  return parts.slice(-2).join(' ');
+}
+function workoutTitle(entries){
+  const lifts = entries.filter(e => isLoadedLift(e.name)).sort((a,b) => b.sets - a.sets);
+  const cardio = entries.filter(e => /\b(ski|run|row|bike|sled|burpee)\b/i.test(e.name)).sort((a,b) => b.sets - a.sets);
+  const words = [];
+  const add = n => { const w = titleWord(n); if(w && !words.some(x => nameKey(x) === nameKey(w))) words.push(w); };
+  lifts.slice(0,3).forEach(e => add(e.name));
+  if(cardio[0]) add(cardio[0].name);
+  const use = words.slice(0,3);
+  if(!use.length) return 'Workout: Training session';
+  if(use.length === 1) return `Workout: ${use[0]}`;
+  if(use.length === 2) return `Workout: ${use[0]} and ${use[1]}`;
+  return `Workout: ${use.slice(0,-1).join(', ')}, and ${use[use.length-1]}`;
+}
+function stravaSummary(raw){
+  const entries = movementTotals(raw);
+  if(!entries.length) return '';
+  let title = workoutTitle(entries);
+  if(/Training session$/.test(title)){
+    const first = (String(raw||'').match(/^\s*SECTION:\s*([^|\n]+)/im) || [])[1];
+    if(first) title = `Workout: ${abbrev(first.split(/\s*,\s*/)[0].trim())}`;
+  }
+  return [title, ...entries.map(movementLine)].join('\n');
+}
+function renderStrava(){ const el = $('stravaOut'); if(el) el.value = stravaSummary($('edRaw').value); }
+async function copyText(txt){
+  try{ await navigator.clipboard.writeText(txt); return true; }
+  catch(e){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = txt; ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, txt.length);
+      const ok = document.execCommand('copy'); ta.remove(); return ok;
+    }catch(err){ return false; }
+  }
+}
+A.copyStrava = async (el) => {
+  const ta = $(el.dataset.src); if(!ta) return;
+  const txt = (ta.value || '').trim();
+  if(!txt){ toast('Nothing to copy yet'); return; }
+  const ok = await copyText(txt);
+  if(!ok){ toast('Copy blocked. Select the text and copy manually.'); return; }
+  haptic(15); toast('Copied to clipboard');
+  const label = el.textContent;
+  el.textContent = 'Success! Copied';
+  el.classList.remove('btn-ghost'); el.classList.add('btn-primary');
+  setTimeout(() => { el.textContent = label; el.classList.remove('btn-primary'); el.classList.add('btn-ghost'); }, 1800);
+};
+
 /* OCR: Tesseract loads only when needed so the app stays light offline */
 let tessLoading = null;
 function loadTesseract(){
@@ -1368,6 +1612,7 @@ $('ocrInput').addEventListener('change', async () => {
     catch(err){ status.textContent = 'Could not read that image. Try a sharper screenshot.'; return; }
   }
   ta.value = combined.trim();
+  renderStrava();
   status.textContent = 'Raw text added. Tap Auto-tag lines, then tidy anything it missed.';
   $('ocrInput').value = '';
 });
@@ -1726,6 +1971,7 @@ function completeWorkout(){
   $('doneNotes').value = (w && w.notes) || '';
   const logged = Object.values(w.logs||{}).filter(l => l.done).length;
   $('doneSummary').textContent = `${w.title}${logged ? `, ${logged} sets logged` : ''}`;
+  $('stravaOutDone').value = stravaSummary(w.raw);
   go('screenDone', { replace:true });
   launchConfetti();
 }
@@ -2261,4 +2507,3 @@ go('screenHome', { replace:true });
 </script>
 </body>
 </html>
-
