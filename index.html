@@ -1309,7 +1309,7 @@ function autoTitle(){
   if(ed.titleEdited) return;
   const v = $('edDate').value; if(!v) return;
   const d = dateFrom(v);
-  const label = ed.type === 'Run' ? 'run' : ed.type === 'Hyrox' ? 'Hyrox session' : 'strength';
+  const label = ed.type === 'Run' ? 'run' : ed.type === 'Hyrox' ? 'Hyrox Session' : 'strength';
   $('edTitle').value = `${d.toLocaleDateString('en-US',{month:'long'})} ${ordinal(d.getDate())} ${label}`;
 }
 function openEditor(id, preset){
