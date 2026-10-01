@@ -363,6 +363,7 @@ html[data-theme="light"] .setref .pr b{color:#7A5B00}
    ============================================================ */
 .setrow{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
 .setrow:last-child{border-bottom:0}
+#stStudioRows .setrow:last-child{border-bottom:1px solid var(--line)}
 .setrow .k{flex:1;min-width:0}
 .setrow .k b{display:block;font-weight:700;font-size:15px}
 .setrow .k small{display:block;color:var(--text2);font-size:12px;margin-top:2px;line-height:1.4}
@@ -506,6 +507,7 @@ REST: 2' | Rest two minutes"></textarea>
     </div>
     <div class="h1" id="blocksHead"></div>
     <div class="meta mt4" id="blocksMeta"></div>
+    <div class="meta-sm mt4 hidden" id="voicePrep"></div>
     <div class="grid2 mt16 mb16">
       <button class="btn btn-primary" data-action="playAll">Start from top</button>
       <button class="btn btn-ghost" data-action="resetProgress">Reset progress</button>
@@ -811,9 +813,17 @@ REST: 2' | Rest two minutes"></textarea>
     </div>
     <div class="sect"><span class="h2">Voice and player</span></div>
     <div class="card flat">
-      <div class="setrow"><div class="k"><b>Voice</b><small id="stVoiceHint">Best available English voice</small></div><select class="input" id="stVoice" data-action-change="stVoice" style="max-width:170px"></select></div>
+      <div class="setrow"><div class="k"><b>Voice engine</b><small id="stEngineHint"></small></div><div class="seg" id="stEngine"><button data-action="stEngine" data-v="studio">Studio</button><button data-action="stEngine" data-v="iphone">iPhone</button></div></div>
+      <div id="stStudioRows">
+        <div class="setrow"><div class="k"><b>Studio provider</b><small>OpenAI is the quickest to set up</small></div><div class="seg" id="stProvider"><button data-action="stProvider" data-v="openai">OpenAI</button><button data-action="stProvider" data-v="google">Google</button></div></div>
+        <div class="setrow"><div class="k"><b>API key</b><small id="stKeyHint"></small></div><button class="btn btn-ghost btn-sm" data-action="stKey" id="stKeyBtn">Add key</button></div>
+        <div class="setrow"><div class="k"><b>Studio voice</b></div><select class="input" id="stStudioVoice" data-action-change="stStudioVoice" style="max-width:170px"></select></div>
+        <div class="setrow"><div class="k"><b>Play over music</b><small>Spotify keeps playing. Silent Mode must be off or the voice is muted.</small></div><span class="switch" id="stMixMusic" data-action="stToggle" data-k="mixMusic" role="switch"></span></div>
+        <div class="setrow"><div class="k"><b>Saved voice clips</b><small id="stClipHint">Stored on this phone so repeat lines play instantly</small></div><button class="btn btn-ghost btn-sm" data-action="stClearClips">Clear</button></div>
+      </div>
+      <div class="setrow"><div class="k"><b>iPhone voice</b><small id="stVoiceHint">Best available English voice</small></div><select class="input" id="stVoice" data-action-change="stVoice" style="max-width:170px"></select></div>
       <div class="setrow"><div class="k"><b>Speed</b><small id="stRateV"></small></div><input type="range" class="range" min="0.6" max="1.3" step="0.02" id="stRate" data-action-input="stRate"></div>
-      <div class="setrow"><div class="k"><b>Test voice</b></div><button class="btn btn-ghost btn-sm" data-action="stTestVoice">Play</button></div>
+      <div class="setrow"><div class="k"><b>Test voice</b><small id="stVoiceStatus"></small></div><button class="btn btn-ghost btn-sm" data-action="stTestVoice">Play</button></div>
       <div class="setrow"><div class="k"><b>Auto-read steps</b><small>Read each step aloud when it appears</small></div><span class="switch" id="stAutoRead" data-action="stToggle" data-k="autoRead" role="switch"></span></div>
       <div class="setrow"><div class="k"><b>Get-ready countdown</b><small>Seconds before each step</small></div><div class="seg" id="stCountdown"><button data-action="stCountdown" data-v="0">Off</button><button data-action="stCountdown" data-v="3">3</button><button data-action="stCountdown" data-v="5">5</button><button data-action="stCountdown" data-v="10">10</button></div></div>
       <div class="setrow"><div class="k"><b>Auto-advance after timers</b><small>Move on when a rest or timed step ends</small></div><span class="switch" id="stAutoAdvance" data-action="stToggle" data-k="autoAdvance" role="switch"></span></div>
@@ -863,14 +873,15 @@ REST: 2' | Rest two minutes"></textarea>
    settings, pwa, boot
    ============================================================ */
 'use strict';
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 const DB_KEY = 'roxlog_v2';
 const LEGACY_KEY = 'workoutRepo';
 
 /* ---------------- STORE ---------------- */
 const DEFAULT_SETTINGS = {
   name:'Ty', theme:'dark', units:'lb', dist:'mi', division:'men_open',
-  voiceURI:null, rate:0.92, autoRead:true, countdown:5, autoAdvance:true, wakeLock:true, haptics:true
+  voiceURI:null, rate:0.92, autoRead:true, countdown:5, autoAdvance:true, wakeLock:true, haptics:true,
+  voiceEngine:'studio', voiceProvider:'openai', studioVoiceOpenai:'cedar', studioVoiceGoogle:'en-US-Chirp3-HD-Charon', mixMusic:true
 };
 let DB = null;
 function freshDB(){ return { v:2, settings:{...DEFAULT_SETTINGS}, workouts:[], sims:[], races:[], templates:[] }; }
@@ -955,49 +966,277 @@ function applyTheme(){
 }
 mq.addEventListener && mq.addEventListener('change', () => { if(S().theme === 'system') applyTheme(); });
 
-/* ---------------- SPEECH ---------------- */
+/* ---------------- SPEECH ----------------
+   Why Spotify paused: iOS gives the built-in speech voice (speechSynthesis) an exclusive audio
+   session, so any music app is stopped the moment it talks. Nothing a web page sets changes that.
+   The studio voice avoids it: each line is turned into an audio clip by a cloud voice (OpenAI or
+   Google) and played through Web Audio, which iOS runs in a mixable "ambient" session, so music
+   keeps playing underneath. Clips are cached on the phone, so each line is fetched once.
+   The iPhone voice stays as the fallback, so a cue is never silently dropped. */
+const VOICE_CACHE = 'tk-voice-v1';
+const VOICE_STYLE = 'Voice: a confident, upbeat strength and conditioning coach on a gym floor. Tone: clear and motivating, never cheesy. Delivery: crisp and punchy, short pauses between sentences. Say numbers, weights and distances very clearly.';
+const STUDIO_VOICES = {
+  openai: [['cedar','Cedar, male'],['ash','Ash, male'],['onyx','Onyx, deep male'],['echo','Echo, male'],['verse','Verse, male'],['ballad','Ballad, male'],['marin','Marin, female'],['coral','Coral, female'],['nova','Nova, female'],['sage','Sage, female'],['shimmer','Shimmer, female'],['alloy','Alloy, neutral'],['fable','Fable, British']],
+  google: [['en-US-Chirp3-HD-Charon','Charon, male'],['en-US-Chirp3-HD-Fenrir','Fenrir, male'],['en-US-Chirp3-HD-Puck','Puck, male'],['en-US-Chirp3-HD-Orus','Orus, male'],['en-US-Chirp3-HD-Aoede','Aoede, female'],['en-US-Chirp3-HD-Kore','Kore, female'],['en-US-Chirp3-HD-Leda','Leda, female'],['en-US-Chirp3-HD-Zephyr','Zephyr, female']]
+};
+const TTS1_VOICES = ['alloy','ash','coral','echo','fable','onyx','nova','sage','shimmer'];
+const FIXED_PHRASES = ['1','2','3','4','5','6','7','8','9','10','30 seconds','10 seconds',"Time's up"];
+const TEST_PHRASE = 'Set 2 of 3. 5 reps at 185 pounds. Rest 2 minutes.';
+function hashStr(s){ let a = 0x811c9dc5, b = 0x9747b28c; for(let i = 0; i < s.length; i++){ const c = s.charCodeAt(i); a = Math.imul(a ^ c, 16777619); b = Math.imul(b ^ c, 2246822519); } return (a>>>0).toString(16).padStart(8,'0') + (b>>>0).toString(16).padStart(8,'0') + s.length.toString(36); }
+function b64ToBuf(b64){ const bin = atob(b64); const u = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 const Speech = {
   voices: [], best: null,
+  ctx: null, out: null, q: [], cur: null, mem: new Map(), primed: false,
+  model: 'gpt-4o-mini-tts', disabled: null, lastErr: null, okCount: 0, toastAt: 0,
+  prep: { total:0, done:0, failed:0, running:false, gen:0 },
+
+  /* ---- iPhone voice (built in, pauses music on iOS) ---- */
   refresh(){
     this.voices = (window.speechSynthesis ? speechSynthesis.getVoices() : []).filter(v => /^en/i.test(v.lang));
     const score = v => { const n = v.name || ''; let s = 0; if(/premium/i.test(n)) s += 100; else if(/enhanced/i.test(n)) s += 80; if(/\b(Ava|Zoe|Evan|Nathan|Samantha|Allison|Susan|Tom|Aaron|Nicky|Karen|Daniel|Moira)\b/i.test(n)) s += 40; if(/Google (US|UK) English/i.test(n)) s += 20; if(v.lang === 'en-US') s += 10; if(v.localService) s += 3; return s; };
     const saved = S().voiceURI && this.voices.find(v => v.voiceURI === S().voiceURI);
     this.best = saved || this.voices.slice().sort((a,b) => score(b) - score(a))[0] || null;
   },
-  /* Ask iOS to mix our audio with music instead of pausing it (Safari 17+) */
-  mix(){ try{ if(navigator.audioSession && navigator.audioSession.type !== 'ambient') navigator.audioSession.type = 'ambient'; }catch(e){} },
-  /* Hold the page's audio session in ambient mode with a silent looping clip, started from a tap.
-     Experimental: iOS speech may still interrupt music if WebKit ignores this for speech. */
-  keepAlive(){
-    try{
-      this.mix();
-      if(this._ka) { if(this._ka.paused) this._ka.play().catch(()=>{}); return; }
-      const rate = 8000, n = rate, buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf);
-      const w = (o, s) => { for(let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
-      w(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
-      dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-      dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
-      w(36, 'data'); dv.setUint32(40, n * 2, true);
-      const a = new Audio(URL.createObjectURL(new Blob([buf], {type:'audio/wav'})));
-      a.loop = true; a.volume = 0.01; a.setAttribute('playsinline', '');
-      this._ka = a; a.play().catch(()=>{});
-    }catch(e){}
-  },
-  say(text, opts={}){
-    if(!window.speechSynthesis) return;
-    this.mix();
+  sayIphone(text, opts={}){
+    if(!window.speechSynthesis){ if(opts.onstart) opts.onstart(null); if(opts.onend) setTimeout(opts.onend, 0); return; }
     if(opts.interrupt) speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = opts.rate || S().rate || 0.92; u.pitch = 1;
     if(this.best) u.voice = this.best;
     if(opts.onend) u.onend = opts.onend;
     speechSynthesis.speak(u);
+    if(opts.onstart) opts.onstart(null);
   },
-  stop(){ if(window.speechSynthesis) speechSynthesis.cancel(); }
+
+  /* ---- settings ---- */
+  provider(){ return S().voiceProvider === 'google' ? 'google' : 'openai'; },
+  keyName(p){ return 'tk_voice_key_' + (p || this.provider()); },
+  key(p){ try{ return localStorage.getItem(this.keyName(p)) || ''; }catch(e){ return ''; } },
+  setKey(k, p){ try{ if(k) localStorage.setItem(this.keyName(p), k); else localStorage.removeItem(this.keyName(p)); }catch(e){} this.disabled = null; this.lastErr = null; this.model = 'gpt-4o-mini-tts'; },
+  voiceName(){ const p = this.provider(); const list = STUDIO_VOICES[p]; const v = p === 'google' ? S().studioVoiceGoogle : S().studioVoiceOpenai; return list.some(x => x[0] === v) ? v : list[0][0]; },
+  speed(){ return clamp(Math.round((Number(S().rate) || 0.92) / 0.92 * 20) / 20, 0.7, 1.5); },
+  paceText(){ const s = this.speed(); return s <= 0.8 ? 'Pace: slow and deliberate.' : s < 0.95 ? 'Pace: relaxed and unhurried.' : s <= 1.05 ? 'Pace: natural and steady.' : s <= 1.2 ? 'Pace: brisk.' : 'Pace: fast but clear.'; },
+  wants(){ return S().voiceEngine !== 'iphone'; },
+  studio(){ return this.wants() && !!this.key() && !this.disabled; },
+
+  /* ---- audio output: Web Audio in a mixable session ---- */
+  session(){ try{ if(navigator.audioSession){ const t = S().mixMusic === false ? 'playback' : 'ambient'; if(navigator.audioSession.type !== t) navigator.audioSession.type = t; } }catch(e){} },
+  mix(){ this.session(); },
+  ensureCtx(){
+    if(this.ctx) return this.ctx;
+    const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return null;
+    this.session();
+    try{ this.ctx = new AC(); }catch(e){ return null; }
+    /* light compression so the voice cuts through music without clipping */
+    const g = this.ctx.createGain(); g.gain.value = 1;
+    const c = this.ctx.createDynamicsCompressor();
+    c.threshold.value = -20; c.knee.value = 12; c.ratio.value = 3; c.attack.value = 0.004; c.release.value = 0.2;
+    const post = this.ctx.createGain(); post.gain.value = 1.35;   /* measured: peaks stay under 0.9, quiet speech gains about 6 to 8 dB */
+    g.connect(c); c.connect(post); post.connect(this.ctx.destination); this.out = g;
+    return this.ctx;
+  },
+  /* runs on every tap: iOS only lets Web Audio start from a user gesture */
+  unlock(){
+    if(!this.studio()) return;
+    const ctx = this.ensureCtx(); if(!ctx) return;
+    this.session();
+    if(ctx.state !== 'running'){ try{ const p = ctx.resume(); if(p && p.catch) p.catch(() => {}); }catch(e){} }
+    if(!this.primed){ try{ const s = ctx.createBufferSource(); s.buffer = ctx.createBuffer(1, 1, 22050); s.connect(ctx.destination); s.start(0); this.primed = true; }catch(e){} }
+  },
+  ready(){
+    const ctx = this.ensureCtx(); if(!ctx) return Promise.resolve(false);
+    this.session();
+    if(ctx.state === 'running') return Promise.resolve(true);
+    let p = null; try{ p = ctx.resume(); }catch(e){}
+    return Promise.race([ (p && p.then ? p : Promise.resolve()).then(() => ctx.state === 'running', () => false), sleep(1200).then(() => ctx.state === 'running') ]);
+  },
+  decode(bytes){
+    const ctx = this.ensureCtx(); if(!ctx) return Promise.reject(new Error('Web Audio is not available'));
+    return new Promise((res, rej) => { try{ const p = ctx.decodeAudioData(bytes.slice(0), res, rej); if(p && p.then) p.then(res, rej); }catch(e){ rej(e); } });
+  },
+
+  /* ---- clips: memory, then the phone's cache, then the network ---- */
+  ckey(text){ const p = this.provider(); return [p, p === 'openai' ? this.model : 'v1', this.voiceName(), (p === 'openai' && this.model !== 'tts-1') ? this.paceText() : this.speed(), 's1', text].join('|'); },
+  clip(text){
+    const k = this.ckey(text);
+    let p = this.mem.get(k);
+    if(p) return p;
+    p = this.load(k, text).catch(e => { this.mem.delete(k); throw e; });
+    p.catch(() => {});
+    this.mem.set(k, p);
+    if(this.mem.size > 800) this.mem.delete(this.mem.keys().next().value);
+    return p;
+  },
+  async openCache(){ try{ if(window.caches && /^https?:$/.test(location.protocol)) return await caches.open(VOICE_CACHE); }catch(e){} return null; },
+  async load(k, text){
+    const cache = await this.openCache();
+    const url = new URL('__voice__/' + hashStr(k), location.href).href;
+    if(cache){ try{ const hit = await cache.match(url); if(hit){ const b = await hit.arrayBuffer(); if(b.byteLength) return b; } }catch(e){} }
+    const bytes = await this.fetchClip(text);
+    if(cache){ try{ await cache.put(url, new Response(bytes.slice(0), { headers:{ 'Content-Type':'audio/mpeg' } })); }catch(e){} }
+    return bytes;
+  },
+  async fetchClip(text){
+    const p = this.provider(), key = this.key(p), who = p === 'google' ? 'Google' : 'OpenAI';
+    if(!key) throw new Error('No API key');
+    for(let attempt = 0; attempt < 4; attempt++){
+      let url, init;
+      if(p === 'google'){
+        url = 'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + encodeURIComponent(key);
+        init = { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ input:{ text }, voice:{ languageCode:'en-US', name: this.voiceName() }, audioConfig:{ audioEncoding:'MP3', speakingRate: this.speed() } }) };
+      } else {
+        const model = this.model, v = this.voiceName();
+        const body = { model, input: text, voice: (model === 'tts-1' && !TTS1_VOICES.includes(v)) ? 'onyx' : v, response_format:'mp3' };
+        if(model === 'tts-1') body.speed = this.speed(); else body.instructions = VOICE_STYLE + ' ' + this.paceText();
+        url = 'https://api.openai.com/v1/audio/speech';
+        init = { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + key }, body: JSON.stringify(body) };
+      }
+      const ac = window.AbortController ? new AbortController() : null;
+      const to = ac ? setTimeout(() => ac.abort(), 15000) : null;
+      let r;
+      try{ r = await fetch(url, ac ? { ...init, signal: ac.signal } : init); }
+      catch(e){ clearTimeout(to); throw new Error(navigator.onLine === false ? 'No internet connection' : `Couldn't reach ${who}`); }
+      clearTimeout(to);
+      if(r.ok){
+        let bytes;
+        if(p === 'google'){ const j = await r.json(); if(!j || !j.audioContent) throw new Error('Google sent no audio'); bytes = b64ToBuf(j.audioContent); }
+        else bytes = await r.arrayBuffer();
+        if(!bytes.byteLength) throw new Error(`${who} sent no audio`);
+        this.okCount++; this.lastErr = null;
+        return bytes;
+      }
+      let msg = ''; try{ const j = await r.json(); msg = (j && j.error && (j.error.message || j.error.status)) || ''; }catch(e){}
+      msg = String(msg).slice(0, 160);
+      if(r.status === 401 || (r.status === 400 && /api key/i.test(msg))){ this.disable(`${who} rejected the key`, msg); throw new Error(msg || 'Key rejected'); }
+      if(r.status === 403){ this.disable(`${who} refused the request`, msg); throw new Error(msg || 'Request refused'); }
+      if(r.status === 429 && /quota|billing|credit|exceeded your/i.test(msg)){ this.disable(`${who} account is out of credit`, msg); throw new Error(msg); }
+      if(p === 'openai' && this.model !== 'tts-1' && (r.status === 400 || r.status === 404) && /model|voice|instruction/i.test(msg)){ this.model = 'tts-1'; continue; }
+      if(r.status === 429 || r.status >= 500){ await sleep(700 * (attempt + 1)); continue; }
+      throw new Error(msg || `${who} error ${r.status}`);
+    }
+    throw new Error(`${who} is busy, try again`);
+  },
+  disable(reason, detail){
+    if(this.disabled) return;
+    this.disabled = reason; this.lastErr = detail || reason;
+    toast(`${reason}. Using the iPhone voice for now.`, 4500);
+    this.prepUI();
+  },
+  fail(err, usedIphone){
+    this.lastErr = (err && err.message) || String(err);
+    const now = Date.now();
+    if(!this.disabled && now - this.toastAt > 20000){ this.toastAt = now; toast(`Studio voice: ${this.lastErr}.${usedIphone ? ' Used the iPhone voice.' : ''}`, 3500); }
+    this.prepUI();
+  },
+
+  /* ---- speaking: same interface as before (interrupt, onend) plus onstart(durationSec) ---- */
+  say(text, opts={}){
+    text = String(text == null ? '' : text).trim();
+    if(!text){ if(opts.onstart) opts.onstart(null); if(opts.onend) setTimeout(opts.onend, 0); return; }
+    if(!this.studio()) return this.sayIphone(text, opts);
+    if(opts.interrupt) this.stop();
+    this.q.push({ text, opts, bytes: this.clip(text) });
+    this.pump();
+  },
+  pump(){
+    if(this.cur || !this.q.length) return;
+    const item = this.q.shift(); this.cur = item;
+    const done = () => { if(this.cur !== item) return; clearTimeout(item.wd); this.cur = null; if(item.opts.onend){ try{ item.opts.onend(); }catch(e){} } this.pump(); };
+    Promise.race([ item.bytes, sleep(8000).then(() => { throw new Error('the voice took too long to load'); }) ])
+      .then(bytes => this.decode(bytes))
+      .then(buf => this.ready().then(ok => {
+        if(this.cur !== item) return;
+        if(!ok) throw Object.assign(new Error('audio was paused by iOS, tap the screen once'), { locked:true });
+        const src = this.ctx.createBufferSource(); src.buffer = buf; src.connect(this.out);
+        src.onended = done; item.src = src; src.start();
+        item.wd = setTimeout(done, Math.round(buf.duration * 1000) + 1500);
+        if(item.opts.onstart){ try{ item.opts.onstart(buf.duration); }catch(e){} }
+      }))
+      .catch(err => {
+        if(this.cur !== item) return;
+        /* a short tick (3, 2, 1) is not worth pausing the music for; the haptic already fired */
+        if(err && err.locked && item.text.split(/\s+/).length <= 3){ this.fail(err, false); done(); return; }
+        this.fail(err, true);
+        /* never drop an instruction: say it with the iPhone voice instead */
+        item.wd = setTimeout(done, clamp(item.text.split(/\s+/).length * 420 + 900, 1200, 15000));
+        this.sayIphone(item.text, { ...item.opts, interrupt:false, onend: done });
+      });
+  },
+  stop(){
+    const c = this.cur; this.q = []; this.cur = null;
+    if(c){ clearTimeout(c.wd); if(c.src){ c.src.onended = null; try{ c.src.stop(); }catch(e){} } }
+    /* in studio mode only touch the iPhone voice if it is actually talking: poking it can grab the audio session */
+    if(window.speechSynthesis && (!this.studio() || speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel();
+  },
+
+  /* ---- preload whole workouts so the gym's signal doesn't matter ---- */
+  prefetch(texts){
+    const p = this.prep;
+    if(!this.studio()){ this.prepUI(); return; }
+    const list = [...new Set(texts.map(t => String(t == null ? '' : t).trim()).filter(Boolean))];
+    const gen = ++p.gen;
+    p.total = list.length; p.done = 0; p.failed = 0; p.running = true; this.prepUI();
+    let i = 0;
+    const worker = async () => {
+      while(gen === p.gen && i < list.length && this.studio()){
+        const t = list[i++];
+        try{ await this.clip(t); }catch(e){ if(gen === p.gen) p.failed++; }
+        if(gen === p.gen){ p.done++; if(p.done % 3 === 0 || p.done === p.total) this.prepUI(); }
+      }
+    };
+    Promise.all([worker(), worker(), worker()]).then(() => { if(gen === p.gen){ p.running = false; this.prepUI(); } });
+  },
+  prefetchWorkout(w){ if(w) this.prefetch([...FIXED_PHRASES, ...workoutPhrases(w)]); },
+  warm(){
+    if(!this.studio()) return;
+    const t = today();
+    this.prefetch([...FIXED_PHRASES, ...DB.workouts.filter(w => w.date === t && !w.completedAt).flatMap(workoutPhrases)]);
+    this.prune();
+  },
+  async prune(){ try{ const c = await this.openCache(); if(!c) return; const keys = await c.keys(); if(keys.length > 3000){ for(const k of keys.slice(0, keys.length - 2400)) await c.delete(k); } }catch(e){} },
+  async cacheCount(){ try{ const c = await this.openCache(); return c ? (await c.keys()).length : null; }catch(e){ return null; } },
+  async clearCache(){ this.mem.clear(); try{ if(window.caches) await caches.delete(VOICE_CACHE); }catch(e){} },
+  prepText(){
+    if(!this.wants()) return '';
+    if(!this.key()) return 'Voice: iPhone voice, which pauses music. Add a studio voice key in Settings.';
+    if(this.disabled) return `Voice: ${this.disabled}. Using the iPhone voice.`;
+    const p = this.prep;
+    if(p.running) return `Voice: preparing ${p.done} of ${p.total} clips`;
+    if(p.total && p.failed) return `Voice: ${p.total - p.failed} of ${p.total} clips ready. The rest load as you go.`;
+    if(p.total) return S().mixMusic === false ? 'Voice: ready' : 'Voice: ready, plays over your music';
+    return '';
+  },
+  prepUI(){
+    const el = $('voicePrep'); if(el){ const t = this.prepText(); el.textContent = t; el.classList.toggle('hidden', !t); }
+    if(currentScreen === 'screenSettings') renderVoiceStatus();
+  }
 };
+/* every line a workout can say, in the order it will be said */
+function stepSpeech(step, w, si, i){
+  let text = step.spoken;
+  if(step.type === 'SET' && !step.spoken.includes('rep')){
+    const log = w && w.logs ? w.logs[`${si}:${i}`] : null; const parsed = step.set || {};
+    const wPref = log && log.w != null ? toUserUnit(log.w, log.u) : (parsed.weight != null ? toUserUnit(parsed.weight, parsed.unit || S().units) : null);
+    const ww = wPref != null ? String(Math.round(wPref*10)/10) : '';
+    const r = log && log.r != null ? String(log.r) : String(parsed.reps ?? '');
+    if(r || ww) text += `. ${r ? r + ' reps' : ''}${ww ? ' at ' + ww + (S().units === 'kg' ? ' kilos' : ' pounds') : ''}`;
+  }
+  return text;
+}
+function workoutPhrases(w){
+  let sections; try{ sections = annotateExercises(groupIntoSections(parseWorkout(w.raw))); }catch(e){ return []; }
+  const out = [];
+  sections.forEach((sec, si) => {
+    if(si > 0) out.push(`Block done. Next: ${sec.title || 'block ' + (si+1)}`);
+    sec.steps.forEach((step, i) => { if(i > 0) out.push(`Coming up: ${step.spoken.split('.')[0]}`); out.push(stepSpeech(step, w, si, i)); });
+  });
+  return out;
+}
 if(window.speechSynthesis){ speechSynthesis.onvoiceschanged = () => Speech.refresh(); }
-Speech.mix();
-document.addEventListener('pointerdown', () => Speech.keepAlive(), {once:true});
+['touchend','click','keydown'].forEach(ev => document.addEventListener(ev, () => Speech.unlock(), { capture:true, passive:true }));
+document.addEventListener('visibilitychange', () => { if(!document.hidden && Speech.ctx && Speech.ctx.state !== 'running'){ Speech.session(); try{ const p = Speech.ctx.resume(); if(p && p.catch) p.catch(() => {}); }catch(e){} } });
 
 /* ---------------- WAKE LOCK ---------------- */
 const Wake = {
@@ -1367,9 +1606,12 @@ A.saveWorkout = () => {
     Object.assign(w, { title, date, type: ed.type, raw, notes });
     if(structureChanged){ w.completedSections = []; w.logs = w.logs || {}; }
     saveDB(); toast('Saved'); back();
+    Speech.prefetchWorkout(w);
   } else {
-    DB.workouts.push({ id: uid('w'), title, date, type: ed.type, raw, notes, distance:null, duration:null, completedSections:[], logs:{}, createdAt: Date.now(), completedAt:null });
+    const nw = { id: uid('w'), title, date, type: ed.type, raw, notes, distance:null, duration:null, completedSections:[], logs:{}, createdAt: Date.now(), completedAt:null };
+    DB.workouts.push(nw);
     saveDB(); toast('Workout added'); goTab('screenHome');
+    Speech.prefetchWorkout(nw);
   }
 };
 A.saveAsTemplate = () => {
@@ -1697,6 +1939,7 @@ function openWorkout(id){
   P.workoutId = id; P.sections = annotateExercises(groupIntoSections(steps)); P.playAll = false;
   if(!P.sessionStart || P.lastWorkoutId !== id) P.sessionStart = Date.now();
   P.lastWorkoutId = id;
+  Speech.prefetchWorkout(w);
   if(P.sections.length <= 1){ openSection(0); return; }
   go('screenBlocks');
 }
@@ -1717,6 +1960,7 @@ RENDERERS.screenBlocks = () => {
   }).join('');
   $('blocksNotes').innerHTML = w.notes ? `<div class="h3 mb8">Notes</div><div class="meta" style="white-space:pre-wrap">${escapeHtml(w.notes)}</div>` : '';
   $('blocksNotes').classList.toggle('hidden', !w.notes);
+  Speech.prepUI();
 };
 A.noop = () => {};
 A.openSection = el => openSection(Number(el.dataset.i));
@@ -1875,14 +2119,15 @@ function showGetReady(newIdx, cd){
   $('pText').className = 'steptext ready'; $('pText').innerHTML = `<b>${escapeHtml(up.raw)}</b>`;
   const ann = `Coming up: ${up.spoken.split('.')[0]}`;
   haptic(20);
-  /* Start the countdown only after the announcement finishes. onend is unreliable on iOS,
-     so a generous word-count fallback also fires; whichever comes first wins, once. */
+  /* Start the countdown only after the announcement finishes. onend is unreliable for the iPhone
+     voice, so a fallback timer also fires; it starts when the voice actually starts (a studio clip
+     may take a moment to load). Whichever comes first wins, once. */
   let started = false;
   const begin = () => { if(started || !P.transitioning || P.pendingIdx !== newIdx) return; started = true; runCountdown(newIdx, cd); };
   const rate = Number(S().rate) || 0.92;
   const est = clamp(Math.round((ann.split(/\s+/).length * 420 + 700) / rate), 1500, 14000);
-  Speech.say(ann, { interrupt:true, onend: () => { P.tos.push(setTimeout(begin, 300)); } });
-  P.tos.push(setTimeout(begin, est));
+  Speech.say(ann, { interrupt:true, onstart: d => { P.tos.push(setTimeout(begin, d ? Math.round(d * 1000) + 900 : est)); }, onend: () => { P.tos.push(setTimeout(begin, 300)); } });
+  P.tos.push(setTimeout(begin, est + 9000));
 }
 function runCountdown(newIdx, n){
   if(n <= 0){ P.transitioning = false; P.idx = newIdx; renderStep(); return; }
@@ -2435,7 +2680,19 @@ RENDERERS.screenSettings = () => {
   const sel = $('stVoice');
   sel.innerHTML = `<option value="">Auto (best available)</option>` + Speech.voices.map(v => `<option value="${escapeHtml(v.voiceURI)}">${escapeHtml(v.name.replace(/\(.*?\)/g,'').trim())} ${v.lang}</option>`).join('');
   sel.value = s.voiceURI || '';
-  $('stVoiceHint').textContent = Speech.best ? `Using ${Speech.best.name.replace(/\(.*?\)/g,'').trim()}` : 'No voices found on this device';
+  $('stVoiceHint').textContent = (Speech.best ? `${Speech.best.name.replace(/\(.*?\)/g,'').trim()}. ` : 'No voices found. ') + 'Pauses music on iPhone.';
+  const studioOn = s.voiceEngine !== 'iphone';
+  setSeg('stEngine', studioOn ? 'studio' : 'iphone');
+  $('stEngineHint').textContent = studioOn ? 'Studio keeps Spotify playing' : 'iPhone voice pauses Spotify while it talks';
+  $('stStudioRows').classList.toggle('hidden', !studioOn);
+  setSeg('stProvider', Speech.provider());
+  const vkey = Speech.key();
+  $('stKeyHint').textContent = vkey ? `Saved on this phone only, ends in ${vkey.slice(-4)}` : (Speech.provider() === 'google' ? 'Paste a Google Cloud API key' : 'Paste an OpenAI API key');
+  $('stKeyBtn').textContent = vkey ? 'Change' : 'Add key';
+  $('stStudioVoice').innerHTML = STUDIO_VOICES[Speech.provider()].map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  $('stStudioVoice').value = Speech.voiceName();
+  setSwitch('stMixMusic', s.mixMusic !== false);
+  renderVoiceStatus();
   $('stRate').value = s.rate; $('stRateV').textContent = `${Number(s.rate).toFixed(2)}x`;
   setSwitch('stAutoRead', s.autoRead); setSwitch('stAutoAdvance', s.autoAdvance); setSwitch('stWakeLock', s.wakeLock); setSwitch('stHaptics', s.haptics);
   setSeg('stCountdown', s.countdown);
@@ -2454,8 +2711,39 @@ A.stDist = el => { S().dist = el.dataset.v; saveDB(); setSeg('stDist', S().dist)
 AC.stDiv = el => { S().division = el.value; SIM.loads = {}; saveDB(); };
 AC.stVoice = el => { S().voiceURI = el.value || null; saveDB(); Speech.refresh(); RENDERERS.screenSettings(); };
 AI.stRate = el => { S().rate = parseFloat(el.value); $('stRateV').textContent = `${S().rate.toFixed(2)}x`; saveDB(); };
-A.stTestVoice = () => Speech.say('Set 2 of 3. 5 reps at 185 pounds. Rest 2 minutes.', { interrupt:true });
-A.stToggle = el => { const k = el.dataset.k; S()[k] = !S()[k]; saveDB(); setSwitch(el.id, S()[k]); if(k === 'wakeLock' && !S()[k]) Wake.off(); };
+A.stTestVoice = () => { Speech.unlock(); Speech.say(TEST_PHRASE, { interrupt:true, onend: () => renderVoiceStatus() }); setTimeout(renderVoiceStatus, 3000); };
+A.stToggle = el => { const k = el.dataset.k; S()[k] = !S()[k]; saveDB(); setSwitch(el.id, S()[k]); if(k === 'wakeLock' && !S()[k]) Wake.off(); if(k === 'mixMusic'){ Speech.session(); renderVoiceStatus(); } };
+function renderVoiceStatus(){
+  const el = $('stVoiceStatus'); if(!el) return;
+  const pv = Speech.provider() === 'google' ? 'Google' : 'OpenAI';
+  const using = Speech.studio() ? `Studio voice (${pv}, ${Speech.voiceName().replace('en-US-Chirp3-HD-','')})` : 'iPhone voice, which pauses music';
+  const sess = navigator.audioSession ? navigator.audioSession.type : 'n/a';
+  let t = `Now using: ${using}. Audio: ${sess}, ${Speech.ctx ? Speech.ctx.state : 'idle'}.`;
+  if(Speech.disabled) t += ` Off because ${Speech.disabled}${Speech.lastErr && Speech.lastErr !== Speech.disabled ? ': ' + Speech.lastErr : ''}.`;
+  else if(Speech.lastErr) t += ` Last problem: ${Speech.lastErr}.`;
+  el.textContent = t;
+  Speech.cacheCount().then(n => { const h = $('stClipHint'); if(h && n != null) h.textContent = `${n} clip${n === 1 ? '' : 's'} stored on this phone so repeat lines play instantly`; });
+}
+A.stEngine = el => { S().voiceEngine = el.dataset.v; saveDB(); Speech.stop(); RENDERERS.screenSettings(); };
+A.stProvider = el => { S().voiceProvider = el.dataset.v; saveDB(); Speech.stop(); Speech.disabled = null; Speech.lastErr = null; RENDERERS.screenSettings(); };
+AC.stStudioVoice = el => { if(Speech.provider() === 'google') S().studioVoiceGoogle = el.value; else S().studioVoiceOpenai = el.value; saveDB(); renderVoiceStatus(); };
+A.stKey = () => {
+  const p = Speech.provider(), has = !!Speech.key();
+  const help = p === 'google'
+    ? 'Google Cloud console: enable the Cloud Text-to-Speech API, then APIs and Services, Credentials, Create credentials, API key.'
+    : 'platform.openai.com: add a few dollars of credit under Billing, then API keys, Create new secret key.';
+  sheet({ title: p === 'google' ? 'Google API key' : 'OpenAI API key',
+    html: `<input class="input" id="stKeyInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${p === 'google' ? 'AIza...' : 'sk-...'}" style="margin-bottom:10px"><div class="hint" style="margin-bottom:14px">${escapeHtml(help)} The key stays on this phone. It is not saved in backups or on GitHub.</div>`,
+    actions: [{ label:'Save key', cls:'btn-primary', fn: () => {
+      const k = ($('stKeyInput').value || '').trim().replace(/^Bearer\s+/i, '');
+      if(!k){ toast('Paste a key first'); return; }
+      Speech.setKey(k); if(S().voiceEngine === 'iphone'){ S().voiceEngine = 'studio'; saveDB(); }
+      RENDERERS.screenSettings(); toast('Key saved. Tap Play to test it.');
+      Speech.prefetch([TEST_PHRASE, ...FIXED_PHRASES]);
+    } }].concat(has ? [{ label:'Remove key', cls:'btn-danger-soft', fn: () => { Speech.setKey(''); RENDERERS.screenSettings(); toast('Key removed'); } }] : [])
+  });
+};
+A.stClearClips = () => confirmSheet('Clear saved voice clips?', 'They download again the next time you open a workout.', 'Clear', async () => { await Speech.clearCache(); RENDERERS.screenSettings(); toast('Voice clips cleared'); });
 A.stCountdown = el => { S().countdown = Number(el.dataset.v); saveDB(); setSeg('stCountdown', S().countdown); };
 
 /* backup + restore */
@@ -2523,9 +2811,11 @@ A.installApp = async () => { if(!PWA.prompt) return; PWA.prompt.prompt(); await 
 DB = loadDB();
 applyTheme();
 Speech.refresh();
+Speech.session();
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && $('overlay').classList.contains('on')) closeSheet(); });
 window.addEventListener('pagehide', () => { if(P.workoutId) saveCurrentLog(false); });
 go('screenHome', { replace:true });
+setTimeout(() => Speech.warm(), 1500);
 </script>
 </body>
 </html>
