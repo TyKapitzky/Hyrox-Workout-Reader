@@ -966,6 +966,23 @@ const Speech = {
   },
   /* Ask iOS to mix our audio with music instead of pausing it (Safari 17+) */
   mix(){ try{ if(navigator.audioSession && navigator.audioSession.type !== 'ambient') navigator.audioSession.type = 'ambient'; }catch(e){} },
+  /* Hold the page's audio session in ambient mode with a silent looping clip, started from a tap.
+     Experimental: iOS speech may still interrupt music if WebKit ignores this for speech. */
+  keepAlive(){
+    try{
+      this.mix();
+      if(this._ka) { if(this._ka.paused) this._ka.play().catch(()=>{}); return; }
+      const rate = 8000, n = rate, buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf);
+      const w = (o, s) => { for(let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+      w(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+      dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+      dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+      w(36, 'data'); dv.setUint32(40, n * 2, true);
+      const a = new Audio(URL.createObjectURL(new Blob([buf], {type:'audio/wav'})));
+      a.loop = true; a.volume = 0.01; a.setAttribute('playsinline', '');
+      this._ka = a; a.play().catch(()=>{});
+    }catch(e){}
+  },
   say(text, opts={}){
     if(!window.speechSynthesis) return;
     this.mix();
@@ -980,6 +997,7 @@ const Speech = {
 };
 if(window.speechSynthesis){ speechSynthesis.onvoiceschanged = () => Speech.refresh(); }
 Speech.mix();
+document.addEventListener('pointerdown', () => Speech.keepAlive(), {once:true});
 
 /* ---------------- WAKE LOCK ---------------- */
 const Wake = {
@@ -1309,7 +1327,7 @@ function autoTitle(){
   if(ed.titleEdited) return;
   const v = $('edDate').value; if(!v) return;
   const d = dateFrom(v);
-  const label = ed.type === 'Run' ? 'run' : ed.type === 'Hyrox' ? 'Hyrox Session' : 'strength';
+  const label = ed.type === 'Run' ? 'run' : ed.type === 'Hyrox' ? 'Hyrox session' : 'strength';
   $('edTitle').value = `${d.toLocaleDateString('en-US',{month:'long'})} ${ordinal(d.getDate())} ${label}`;
 }
 function openEditor(id, preset){
