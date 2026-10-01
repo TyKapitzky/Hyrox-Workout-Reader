@@ -964,8 +964,11 @@ const Speech = {
     const saved = S().voiceURI && this.voices.find(v => v.voiceURI === S().voiceURI);
     this.best = saved || this.voices.slice().sort((a,b) => score(b) - score(a))[0] || null;
   },
+  /* Ask iOS to mix our audio with music instead of pausing it (Safari 17+) */
+  mix(){ try{ if(navigator.audioSession && navigator.audioSession.type !== 'ambient') navigator.audioSession.type = 'ambient'; }catch(e){} },
   say(text, opts={}){
     if(!window.speechSynthesis) return;
+    this.mix();
     if(opts.interrupt) speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = opts.rate || S().rate || 0.92; u.pitch = 1;
@@ -976,6 +979,7 @@ const Speech = {
   stop(){ if(window.speechSynthesis) speechSynthesis.cancel(); }
 };
 if(window.speechSynthesis){ speechSynthesis.onvoiceschanged = () => Speech.refresh(); }
+Speech.mix();
 
 /* ---------------- WAKE LOCK ---------------- */
 const Wake = {
